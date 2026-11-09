@@ -1,0 +1,34 @@
+# Classic two-resource deadlock (Sec. 8.2): A holds R1 and wants R2,
+# B holds R2 and wants R1. Both block forever; the run ends only because of
+# --max-ticks. Your deadlock_check() (checkpoint 1) must report {A, B}:
+#   ./ossim workloads/deadlock.txt --sched rr --quantum 2 --deadlock-every 5 --max-ticks 50 --no-paging
+# Keep --no-paging. With paging on, page faults change the timing, A and B do
+# not overlap, and all three processes finish with no deadlock.
+# Process C is independent and must still finish.
+
+resource R1 1
+resource R2 1
+
+process A arrive=0 pages=1
+    cpu 2
+    acquire R1
+    cpu 3
+    acquire R2
+    cpu 2
+    release R2
+    release R1
+end
+
+process B arrive=1 pages=1
+    cpu 1
+    acquire R2
+    cpu 3
+    acquire R1
+    cpu 2
+    release R1
+    release R2
+end
+
+process C arrive=0 pages=1
+    cpu 6
+end

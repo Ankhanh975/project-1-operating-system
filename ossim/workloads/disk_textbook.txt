@@ -1,0 +1,35 @@
+# Textbook disk-scheduling example (Silberschatz Sec. 11.2): requests for
+# cylinders 98, 183, 37, 122, 14, 124, 65, 67 all queued at t=0, head at 53,
+# 200 cylinders. One process per request so that they are submitted together,
+# in this order (FCFS serves them in file order).
+# Expected total head movement:
+#   FCFS 640 | SSTF 236 | SCAN (moving down first) 236 | C-SCAN 382 | C-LOOK 322
+# Run with --no-paging so the only disk traffic is these eight requests:
+#   ./ossim workloads/disk_textbook.txt --no-paging --head 53 --disk fcfs
+#   ./ossim workloads/disk_textbook.txt --no-paging --head 53 --direction down --disk scan
+#   ./ossim workloads/disk_textbook.txt --no-paging --head 53 --direction up --disk clook
+
+process r98  arrive=0 pages=1
+    disk 98
+end
+process r183 arrive=0 pages=1
+    disk 183
+end
+process r37  arrive=0 pages=1
+    disk 37
+end
+process r122 arrive=0 pages=1
+    disk 122
+end
+process r14  arrive=0 pages=1
+    disk 14
+end
+process r124 arrive=0 pages=1
+    disk 124
+end
+process r65  arrive=0 pages=1
+    disk 65
+end
+process r67  arrive=0 pages=1
+    disk 67
+end

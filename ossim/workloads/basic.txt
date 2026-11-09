@@ -1,0 +1,19 @@
+# Textbook example (Silberschatz Sec. 5.3.1): three CPU-only processes
+# arriving at t=0 with bursts 24, 3, 3.
+#   FCFS      : waiting 0, 24, 27  -> average 17.00
+#   RR (q=4)  : waiting 6, 4, 7    -> average 5.67
+# Run with --no-paging so that the numbers depend on the CPU scheduler only:
+#   ./ossim workloads/basic.txt --sched fcfs --no-paging --gantt
+#   ./ossim workloads/basic.txt --sched rr --quantum 4 --no-paging --gantt
+
+process P1 arrive=0 pages=1
+    cpu 24
+end
+
+process P2 arrive=0 pages=1
+    cpu 3
+end
+
+process P3 arrive=0 pages=1
+    cpu 3
+end

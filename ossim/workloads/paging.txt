@@ -1,0 +1,20 @@
+# Paging workload: two processes whose reference streams do not fit in a
+# small memory. Run with e.g.
+#   ./ossim workloads/paging.txt --frames 3 --replace fifo --trace
+#   ./ossim workloads/paging.txt --frames 4 --replace fifo
+# and watch page faults turn into disk requests, disk completions turn into
+# READY transitions, and the fault rate fall as frames increase.
+#
+# P1's stream is the textbook string 7,0,1,2,0,3,0,4,2,3,0,3,0,3,2,1,2,0,1,7,0,1
+# (Sec. 10.4). Alone with 3 frames it gives 15 faults under FIFO, 12 under
+# LRU, 9 under OPT; here P2 competes for the same global frame pool.
+
+process P1 arrive=0 pages=8
+    cpu 22 refs=7,0,1,2,0,3,0,4,2,3,0,3,0,3,2,1,2,0,1,7,0,1
+end
+
+process P2 arrive=5 pages=4
+    cpu 12 refs=0,1,2,3,0,1,2,3,0,1,2,3
+    io 4
+    cpu 6 refs=0,0,1,1,2,2
+end

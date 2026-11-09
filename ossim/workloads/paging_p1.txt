@@ -1,0 +1,8 @@
+# Single process with the textbook reference string (Sec. 10.4.2):
+#   7,0,1,2,0,3,0,4,2,3,0,3,0,3,2,1,2,0,1,7,0,1
+# Expected page faults with 3 frames: FIFO 15, LRU 12, Optimal 9.
+# Used by tests/run.sh to validate the replacement policies.
+
+process P1 arrive=0 pages=8
+    cpu 22 refs=7,0,1,2,0,3,0,4,2,3,0,3,0,3,2,1,2,0,1,7,0,1
+end

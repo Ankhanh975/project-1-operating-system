@@ -1,0 +1,44 @@
+# Everything together: CPU bursts, page faults, file I/O through the disk
+# scheduler, generic I/O and a shared lock. This is the kind of workload to
+# use for the experiments in your report (vary --frames, --quantum,
+# --replace, --disk and compare metrics).
+#   ./ossim workloads/mixed.txt --sched rr --quantum 3 --frames 6 --gantt
+
+semaphore lock 1
+
+process editor arrive=0 prio=2 pages=6
+    cpu 5 refs=0,1,2,3,4,5
+    disk 120
+    cpu 4 refs=0,1,0,1
+    wait lock
+    cpu 2 refs=2,2
+    signal lock
+    io 3
+    cpu 3 refs=5,4,3
+end
+
+process compiler arrive=1 prio=3 pages=8
+    cpu 8 refs=0,1,2,3,4,5,6,7
+    disk 30
+    cpu 8 refs=7,6,5,4,3,2,1,0
+    disk 190
+    cpu 4 refs=0,0,1,1
+end
+
+process browser arrive=3 prio=1 pages=5
+    cpu 3 refs=0,1,2
+    io 6
+    wait lock
+    cpu 2 refs=3,4
+    signal lock
+    disk 75
+    cpu 5 refs=0,1,2,3,4
+end
+
+process daemon arrive=10 prio=4 pages=2
+    cpu 2
+    io 2
+    cpu 2
+    io 2
+    cpu 2
+end

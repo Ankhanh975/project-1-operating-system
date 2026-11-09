@@ -1,0 +1,50 @@
+# Bounded buffer with two slots (Sec. 7.1.1): semaphores empty=2, full=0,
+# mutex=1. The producer makes 3 items, the consumer takes 3. The consumer
+# must block on `full` until the producer has signalled it.
+# Try: ./ossim workloads/producer_consumer.txt --sched rr --quantum 2 --trace
+
+semaphore empty 2
+semaphore full  0
+semaphore mutex 1
+
+process producer arrive=0 pages=1
+    cpu 2            # produce item 1
+    wait empty
+    wait mutex
+    cpu 1            # put into buffer
+    signal mutex
+    signal full
+    cpu 2            # produce item 2
+    wait empty
+    wait mutex
+    cpu 1
+    signal mutex
+    signal full
+    cpu 2            # produce item 3
+    wait empty
+    wait mutex
+    cpu 1
+    signal mutex
+    signal full
+end
+
+process consumer arrive=0 pages=1
+    wait full
+    wait mutex
+    cpu 1            # take from buffer
+    signal mutex
+    signal empty
+    cpu 3            # consume item 1
+    wait full
+    wait mutex
+    cpu 1
+    signal mutex
+    signal empty
+    cpu 3            # consume item 2
+    wait full
+    wait mutex
+    cpu 1
+    signal mutex
+    signal empty
+    cpu 3            # consume item 3
+end

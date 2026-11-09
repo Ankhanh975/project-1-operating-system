@@ -1,0 +1,32 @@
+# Midterm-style scheduling set: staggered arrivals, priorities (1 = highest)
+# and CPU/I/O burst cycles. Use it to compare fcfs, rr, sjf, srtf, prio, mlfq.
+# Use --no-paging so the results depend on the CPU scheduler only:
+#   ./ossim workloads/arrivals.txt --sched rr --quantum 2 --no-paging --gantt
+
+process J1 arrive=0 prio=2 pages=2
+    cpu 7
+    io 3
+    cpu 4
+end
+
+process J2 arrive=2 prio=1 pages=2
+    cpu 9
+end
+
+process J3 arrive=4 prio=3 pages=2
+    cpu 3
+    io 5
+    cpu 3
+end
+
+process J4 arrive=6 prio=2 pages=2
+    cpu 2
+end
+
+process J5 arrive=8 prio=3 pages=2
+    cpu 5
+end
+
+process J6 arrive=12 prio=1 pages=2
+    cpu 6
+end
