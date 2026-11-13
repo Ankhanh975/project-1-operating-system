@@ -7,9 +7,9 @@ without changing the public simulator interface. The simulator remains
 tick-driven: the kernel owns process state transitions and calls a selected
 policy through `scheduler_t`.
 
-This preliminary version defines the structures, invariants, and validation
-plan only. It does not implement the four missing schedulers or deadlock
-detection.
+The current implementation defines the structures, invariants, and validation
+plan, with priority scheduling, MLFQ, and multi-instance deadlock detection
+implemented. SJF and SRTF remain scaffolded for the next implementation step.
 
 ## Scope
 
@@ -85,13 +85,13 @@ changing ownership or waking processes.
   running process.
 - Equal remaining times do not cause a context switch.
 
-### PRIO
+### PRIO (implemented)
 
 - Smaller `priority` values run first.
 - Preempt when a ready process has a strictly higher priority.
 - Equal priorities use round-robin behavior with `cfg.quantum`.
 
-### MLFQ
+### MLFQ (implemented)
 
 - Level 0 uses `q`, level 1 uses `2q`, and level 2 uses `4q`.
 - Always select the highest non-empty level.
@@ -100,7 +100,7 @@ changing ownership or waking processes.
 - A periodic boost moves ready processes to level 0 and resets their quantum
   state.
 
-### Deadlock detection
+### Deadlock detection (implemented)
 
 Use the multi-instance detection algorithm:
 
@@ -122,9 +122,9 @@ DEADLOCK t=<now> pids: <pid> <pid> ...
 
 1. Add shared scheduler helper functions and initialize each policy's queues.
 2. Implement SJF and SRTF, then verify burst ordering and preemption.
-3. Implement priority scheduling and equal-priority round robin.
-4. Implement MLFQ demotion, blocking behavior, and periodic boosting.
-5. Implement deadlock detection using copied work/finish arrays.
+3. Implemented priority scheduling and equal-priority round robin.
+4. Implemented MLFQ demotion, blocking behavior, and periodic boosting.
+5. Implemented deadlock detection using copied work/finish arrays.
 6. Add hand-computed expected metrics and Gantt-chart checks to
    `tests/run.sh`.
 7. Run the complete regression script and record results.

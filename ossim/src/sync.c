@@ -1,5 +1,5 @@
 /*
- * sync.c: semaphores, resources and deadlock detection.
+ * sync.c: semaphores, resources and multi-instance deadlock detection.
  */
 #include <string.h>
 #include "sync.h"
@@ -9,6 +9,7 @@ ksem_t     sems[MAX_SEMS];
 int        nsems = 0;
 resource_t resources[MAX_RES];
 int        nres = 0;
+static bool last_deadlocked[MAX_PROCS + 1];
 
 ksem_t *sem_find(const char *name)
 {
@@ -128,5 +129,65 @@ void res_release(pcb_t *p, resource_t *r, int n)
  */
 void deadlock_check(void)
 {
-    die("deadlock_check() is not implemented yet (src/sync.c)");
+    int work[MAX_RES];
+    bool finish[MAX_PROCS + 1];
+    bool deadlocked[MAX_PROCS + 1];
+
+    for (int r = 0; r < nres; r++) work[r] = resources[r].available;
+    for (int pid = 1; pid <= nprocs; pid++) {
+        finish[pid] = false;
+        deadlocked[pid] = false;
+    }
+
+    bool changed;
+    do {
+        changed = false;
+        for (int pid = 1; pid <= nprocs; pid++) {
+            if (finish[pid]) continue;
+
+            bool can_finish = true;
+            for (int r = 0; r < nres; r++) {
+                if (resources[r].requested[pid] > work[r]) {
+                    can_finish = false;
+                    break;
+                }
+            }
+            if (!can_finish) continue;
+
+            finish[pid] = true;
+            changed = true;
+            for (int r = 0; r < nres; r++)
+                work[r] += resources[r].allocated[pid];
+        }
+    } while (changed);
+
+    bool any = false;
+    for (int pid = 1; pid <= nprocs; pid++) {
+        pcb_t *p = proc_by_pid(pid);
+        if (!finish[pid] && p->state == P_WAITING) {
+            deadlocked[pid] = true;
+            any = true;
+        }
+    }
+    if (!any) {
+        memset(last_deadlocked, 0, sizeof(last_deadlocked));
+        return;
+    }
+
+    bool same_as_previous = true;
+    for (int pid = 1; pid <= nprocs; pid++) {
+        if (deadlocked[pid] != last_deadlocked[pid]) {
+            same_as_previous = false;
+            break;
+        }
+    }
+    if (same_as_previous) return;
+
+    printf("DEADLOCK t=%ld pids:", now);
+    for (int pid = 1; pid <= nprocs; pid++)
+        if (deadlocked[pid]) printf(" %d", pid);
+    putchar('\n');
+
+    for (int pid = 1; pid <= nprocs; pid++)
+        last_deadlocked[pid] = deadlocked[pid];
 }

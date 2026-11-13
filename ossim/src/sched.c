@@ -1,7 +1,8 @@
 /*
  * sched.c: CPU schedulers.
  *
- * FCFS and RR are given. TODO checkpoint 1: sjf, srtf, prio, mlfq.
+ * FCFS and RR are given. SJF and SRTF remain checkpoint work; priority and
+ * MLFQ are implemented below.
  * Each one is a scheduler_t with the same hooks as FCFS and RR. There are
  * notes above each stub. Functions you will probably need:
  *   proc_burst_remaining(p)   ticks left in p's current cpu burst
@@ -72,19 +73,112 @@ static void srtf_init(void) { die("scheduler 'srtf' is not implemented yet (src/
 static scheduler_t sched_srtf = { "srtf", srtf_init, NULL, NULL, NULL, NULL, NULL, NULL };
 
 /* PRIO
- * TODO: priority with preemption (smaller number = higher priority), and RR
+ * Priority with preemption (smaller number = higher priority), and RR
  * between processes of the same priority. Low priorities can starve; aging
  * is a stretch goal. */
-static void prio_init(void) { die("scheduler 'prio' is not implemented yet (src/sched.c)"); }
-static scheduler_t sched_prio = { "prio", prio_init, NULL, NULL, NULL, NULL, NULL, NULL };
+static queue_t prio_q;
+static int prio_key(const pcb_t *p) { return p->priority; }
+
+static void prio_init(void)            { q_init(&prio_q); }
+static void prio_enqueue(pcb_t *p)     { q_push(&prio_q, p); }
+static pcb_t *prio_pick(void)          { return q_pop_min(&prio_q, prio_key); }
+static void prio_on_dispatch(pcb_t *p) { p->quantum_used = 0; }
+static void prio_on_tick(pcb_t *p)     { p->quantum_used++; }
+static int prio_ready_count(void)      { return q_size(&prio_q); }
+
+static bool prio_should_preempt(pcb_t *r)
+{
+    if (q_empty(&prio_q)) return false;
+    int best = q_min_key(&prio_q, prio_key);
+    if (best < r->priority) return true;
+    if (best == r->priority && r->quantum_used >= cfg.quantum) {
+        r->quantum_used = 0;
+        return true;
+    }
+    return false;
+}
+
+static scheduler_t sched_prio = {
+    "prio", prio_init, prio_enqueue, prio_should_preempt, prio_pick,
+    prio_on_dispatch, prio_on_tick, prio_ready_count
+};
 
 /* MLFQ
- * TODO: multilevel feedback queue with 3 levels, RR with quantum q, 2q and
- * 4q. A process that uses its whole quantum goes down one level. A process
- * that blocks before the quantum ends stays where it is. Every 20 ticks,
- * move everyone back to level 0 so nobody starves. Use p->level. */
-static void mlfq_init(void) { die("scheduler 'mlfq' is not implemented yet (src/sched.c)"); }
-static scheduler_t sched_mlfq = { "mlfq", mlfq_init, NULL, NULL, NULL, NULL, NULL, NULL };
+ * Three-level feedback queue with RR quanta q, 2q and 4q. A process that
+ * uses its whole quantum goes down one level. A process that blocks before
+ * the quantum ends stays where it is. Every 20 ticks, everyone returns to
+ * level 0 so nobody starves. */
+static queue_t mlfq_q[3];
+
+static void mlfq_init(void)
+{
+    for (int i = 0; i < 3; i++) q_init(&mlfq_q[i]);
+}
+
+static void mlfq_enqueue(pcb_t *p)
+{
+    if (p->level < 0) p->level = 0;
+    if (p->level > 2) p->level = 2;
+    q_push(&mlfq_q[p->level], p);
+}
+
+static pcb_t *mlfq_pick(void)
+{
+    for (int i = 0; i < 3; i++)
+        if (!q_empty(&mlfq_q[i])) return q_pop(&mlfq_q[i]);
+    return NULL;
+}
+
+static void mlfq_on_dispatch(pcb_t *p) { p->quantum_used = 0; }
+static int mlfq_ready_count(void)
+{
+    return q_size(&mlfq_q[0]) + q_size(&mlfq_q[1]) + q_size(&mlfq_q[2]);
+}
+
+static void mlfq_boost(void)
+{
+    for (int level = 1; level < 3; level++) {
+        while (!q_empty(&mlfq_q[level])) {
+            pcb_t *p = q_pop(&mlfq_q[level]);
+            p->level = 0;
+            p->quantum_used = 0;
+            q_push(&mlfq_q[0], p);
+        }
+    }
+}
+
+static void mlfq_on_tick(pcb_t *p)
+{
+    p->quantum_used++;
+    if ((now + 1) % 20 == 0) {
+        p->level = 0;
+        p->quantum_used = 0;
+        mlfq_boost();
+    }
+}
+
+static bool mlfq_should_preempt(pcb_t *r)
+{
+    int highest = -1;
+    for (int i = 0; i < 3; i++) {
+        if (!q_empty(&mlfq_q[i])) {
+            highest = i;
+            break;
+        }
+    }
+    if (highest >= 0 && highest < r->level) return true;
+
+    int quantum = cfg.quantum * (1 << r->level);
+    if (r->quantum_used < quantum) return false;
+    r->quantum_used = 0;
+    if (r->level < 2) r->level++;
+    return highest >= 0;
+}
+
+static scheduler_t sched_mlfq = {
+    "mlfq", mlfq_init, mlfq_enqueue, mlfq_should_preempt, mlfq_pick,
+    mlfq_on_dispatch, mlfq_on_tick, mlfq_ready_count
+};
 
 static scheduler_t *all[] = {
     &sched_fcfs, &sched_rr, &sched_sjf, &sched_srtf, &sched_prio, &sched_mlfq

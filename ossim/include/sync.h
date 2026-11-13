@@ -10,9 +10,8 @@
  * much every process holds (allocated) and is waiting for (requested), which
  * is what a detection algorithm needs.
  *
- * Given: semaphores and resources, waiters woken in FIFO order.
- * TODO checkpoint 1: deadlock_check(), with the wait-for graph or the
- * detection algorithm for several instances.
+ * Given: semaphores and resources, waiters woken in FIFO order. Deadlock
+ * detection uses the multi-instance detection algorithm.
  */
 #ifndef OSSIM_SYNC_H
 #define OSSIM_SYNC_H
@@ -51,7 +50,7 @@ void sync_signal(pcb_t *p, ksem_t *s);
 bool res_acquire(pcb_t *p, resource_t *r, int n);
 void res_release(pcb_t *p, resource_t *r, int n);
 
-/* Called every cfg.deadlock_interval ticks. You write this one. */
+/* Called every cfg.deadlock_interval ticks. */
 void deadlock_check(void);
 
 #endif
