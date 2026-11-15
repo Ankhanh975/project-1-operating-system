@@ -1,0 +1,24 @@
+# Textbook example (Silberschatz Sec. 5.3.2, preemptive SJF): four CPU-only
+# processes with arrivals 0, 1, 2, 3 and bursts 8, 4, 9, 5.
+#   SRTF      : P2 arrives at t=1 with 4 < 7 left of P1, so P1 is preempted
+#               Gantt [0-1] P1 | [1-5] P2 | [5-10] P4 | [10-17] P1 | [17-26] P3
+#               waiting 9, 0, 15, 2  -> average 6.50
+#               context switches 5
+# Run with --no-paging so that the numbers depend on the CPU scheduler only:
+#   ./ossim workloads/srtf_textbook.txt --sched srtf --no-paging --gantt
+
+process P1 arrive=0 pages=1
+    cpu 8
+end
+
+process P2 arrive=1 pages=1
+    cpu 4
+end
+
+process P3 arrive=2 pages=1
+    cpu 9
+end
+
+process P4 arrive=3 pages=1
+    cpu 5
+end

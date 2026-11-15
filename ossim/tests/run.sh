@@ -111,10 +111,27 @@ for s in sjf srtf prio mlfq; do
           "$BIN workloads/producer_consumer.txt --sched $s --quantum 2 --no-paging" "finished=2/2"
 done
 
+# Textbook cases (Sec. 5.3.2). The Gantt charts are in the workload files.
+check "SJF textbook example: avg waiting 7.00" \
+      "$BIN workloads/sjf_textbook.txt --sched sjf --no-paging" "avg_waiting=7.00"
+check "SRTF textbook example: avg waiting 6.50" \
+      "$BIN workloads/srtf_textbook.txt --sched srtf --no-paging" "avg_waiting=6.50"
+check "SRTF textbook example: context switches = 5 (P1,P2,P4,P1,P3)" \
+      "$BIN workloads/srtf_textbook.txt --sched srtf --no-paging" "context_switches=5"
+
+# Context switches on arrivals.txt, counted on the hand-drawn Gantt charts.
+check "SJF arrivals: context switches = 8" \
+      "$BIN workloads/arrivals.txt --sched sjf --no-paging" "context_switches=8"
+check "SRTF arrivals: context switches = 9" \
+      "$BIN workloads/arrivals.txt --sched srtf --no-paging" "context_switches=9"
+
 # --- checkpoint 2 ----------------------------------------------------------
 check "Paging: LRU, 3 frames -> 12 faults (textbook Sec. 10.4.4)" \
       "$BIN workloads/paging_p1.txt --frames 3 --replace lru" "page_faults=12"
-# TODO: a Clock case you computed by hand (the textbook has none, make one).
+# Clock on the same string, traced by hand (the textbook has no Clock
+# number). The frame-by-frame trace is in CHECKPOINT2.md.
+check "Paging: Clock, 3 frames -> 14 faults (hand trace)" \
+      "$BIN workloads/paging_p1.txt --frames 3 --replace clock" "page_faults=14"
 
 check "Disk: SSTF, head 53 -> 236" \
       "$BIN workloads/disk_textbook.txt --no-paging --head 53 --disk sstf" "head_movement=236"
@@ -122,6 +139,32 @@ check "Disk: SCAN moving down, head 53 -> 236" \
       "$BIN workloads/disk_textbook.txt --no-paging --head 53 --direction down --disk scan" "head_movement=236"
 check "Disk: C-LOOK moving up, head 53 -> 322" \
       "$BIN workloads/disk_textbook.txt --no-paging --head 53 --direction up --disk clook" "head_movement=322"
+# The other direction of each, computed by hand:
+#   SCAN up:     53 -> 183 -> 199 (edge) -> 14     = 146 + 185      = 331
+#   C-LOOK down: 53 -> 14 -> 183 (jump) -> 65      = 39 + 169 + 118 = 326
+check "Disk: SCAN moving up, head 53 -> 331" \
+      "$BIN workloads/disk_textbook.txt --no-paging --head 53 --direction up --disk scan" "head_movement=331"
+check "Disk: C-LOOK moving down, head 53 -> 326" \
+      "$BIN workloads/disk_textbook.txt --no-paging --head 53 --direction down --disk clook" "head_movement=326"
+
+# Workload generator: the same seed gives the same file, and the file runs.
+GEN=./wlgen
+if [ -x "$GEN" ]; then
+    gen1=$($GEN --procs 6 --seed 42 --disk-local 50)
+    gen2=$($GEN --procs 6 --seed 42 --disk-local 50)
+    if [ "$gen1" = "$gen2" ]; then
+        echo "PASS  Generator: same seed gives the same workload"; pass=$((pass + 1))
+    else
+        echo "FAIL  Generator: same seed gives different workloads"; fail=1
+    fi
+    tmp=${TMPDIR:-/tmp}/ossim_gen_$$.txt
+    echo "$gen1" > "$tmp"
+    check "Generator: generated workload finishes (6 procs, 8 frames)" \
+          "$BIN $tmp --sched rr --quantum 3 --frames 8 --replace clock --disk scan" "finished=6/6"
+    rm -f "$tmp"
+else
+    echo "SKIP  Generator: ./wlgen not built (run make)"; skip=$((skip + 1))
+fi
 
 echo "---"
 echo "$pass passed, $skip skipped (not implemented yet), $([ $fail = 0 ] && echo 0 || echo some) failed"

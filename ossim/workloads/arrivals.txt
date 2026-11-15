@@ -2,6 +2,13 @@
 # and CPU/I/O burst cycles. Use it to compare fcfs, rr, sjf, srtf, prio, mlfq.
 # Use --no-paging so the results depend on the CPU scheduler only:
 #   ./ossim workloads/arrivals.txt --sched rr --quantum 2 --no-paging --gantt
+#
+# Hand-computed results (Gantt charts in CHECKPOINT1.md):
+#   policy      avg_waiting  avg_response  avg_turnaround  context_switches
+#   sjf             10.00         9.00          17.83              8
+#   srtf             9.83         9.00          17.67              9
+#   prio q=2        12.83         8.33          20.67             12
+#   mlfq q=2        15.00         0.00          22.83             18
 
 process J1 arrive=0 prio=2 pages=2
     cpu 7

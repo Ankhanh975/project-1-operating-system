@@ -4,6 +4,7 @@
 # in this order (FCFS serves them in file order).
 # Expected total head movement:
 #   FCFS 640 | SSTF 236 | SCAN (moving down first) 236 | C-SCAN 382 | C-LOOK 322
+# Other direction (our own traces): SCAN up 331 | C-LOOK down 326
 # Run with --no-paging so the only disk traffic is these eight requests:
 #   ./ossim workloads/disk_textbook.txt --no-paging --head 53 --disk fcfs
 #   ./ossim workloads/disk_textbook.txt --no-paging --head 53 --direction down --disk scan
