@@ -4,8 +4,10 @@ CFLAGS  ?= -std=c99 -Wall -Wextra -Werror -O2 -g -Iinclude
 SRC      = $(wildcard src/*.c)
 OBJ      = $(SRC:src/%.c=build/%.o)
 BIN      = ossim
+# The workload generator is a separate program (tools/wlgen.c).
+GEN      = wlgen
 
-all: $(BIN)
+all: $(BIN) $(GEN)
 
 $(BIN): $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $^
@@ -16,10 +18,13 @@ build/%.o: src/%.c include/*.h | build
 build:
 	mkdir -p build
 
-test: $(BIN)
+$(GEN): tools/wlgen.c
+	$(CC) $(CFLAGS) -o $@ $<
+
+test: $(BIN) $(GEN)
 	sh tests/run.sh
 
 clean:
-	rm -rf build $(BIN)
+	rm -rf build $(BIN) $(GEN)
 
 .PHONY: all test clean
