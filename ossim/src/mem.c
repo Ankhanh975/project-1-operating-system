@@ -1,11 +1,12 @@
 /*
  * mem.c: paging with global replacement.
  *
- * FIFO is given: it evicts the page that was loaded first.
- * TODO checkpoint 2: LRU with frames[i].last_used, and Clock with a hand
- * that goes round the frame table and frames[i].referenced (set on every
- * hit, cleared when the hand passes). Both are replacer_t, like FIFO. Put
- * them in all[] below when they work.
+ * Three replacement policies, each a replacer_t (see mem.h):
+ *   FIFO   (given) evicts the page that was loaded first.
+ *   LRU    (checkpoint 2) evicts the page with the oldest last_used.
+ *   Clock  (checkpoint 2) second chance with a hand over the frame table.
+ * mem_access() and mem_install() keep last_used and referenced up to date
+ * for every policy, so a policy only has to choose the victim.
  */
 #include <string.h>
 #include "mem.h"
@@ -34,19 +35,59 @@ static void fifo_on_install(int f) { frames[f].loaded_at = now; }
 static replacer_t rep_fifo = { "fifo", fifo_init, fifo_victim, fifo_on_hit, fifo_on_install };
 
 /* LRU
- * TODO: the victim is the frame with the smallest last_used, among frames
- * with used && !loading. last_used has to be updated on every hit. Look at
- * mem_access() below before you do it again in on_hit. */
-static void lru_init(void) { die("replacement 'lru' is not implemented yet (src/mem.c)"); }
-static replacer_t rep_lru = { "lru", lru_init, NULL, NULL, NULL };
+ * The victim is the page that has gone longest without a reference, that is
+ * the evictable frame with the smallest last_used. mem_access() stamps
+ * last_used on every hit and mem_install() stamps it when the page arrives,
+ * so the hooks have nothing left to do. On equal timestamps the lower frame
+ * index wins, which keeps runs deterministic. */
+static void lru_init(void) {}
 
-/* Clock
- * TODO: second chance. Keep a `hand` that stays between calls. Move it
- * round the frames: if referenced is true, clear it and go on; the first
- * frame with referenced == false is the victim. Skip frames that are free
- * or still loading. */
-static void clock_init(void) { die("replacement 'clock' is not implemented yet (src/mem.c)"); }
-static replacer_t rep_clock = { "clock", clock_init, NULL, NULL, NULL };
+static int lru_victim(void)
+{
+    int best = -1;
+    for (int i = 0; i < nframes; i++) {
+        if (!frames[i].used || frames[i].loading) continue;
+        if (best < 0 || frames[i].last_used < frames[best].last_used) best = i;
+    }
+    return best;
+}
+
+static void lru_on_hit(int f)     { (void)f; }   /* last_used set by mem_access() */
+static void lru_on_install(int f) { (void)f; }   /* last_used set by mem_install() */
+
+static replacer_t rep_lru = { "lru", lru_init, lru_victim, lru_on_hit, lru_on_install };
+
+/* Clock (second chance)
+ * The frames form a circle and `hand` points at the next candidate. It stays
+ * where it is between faults. At a fault the hand moves round:
+ *   - free or still loading frame: skip it, it cannot be evicted;
+ *   - referenced == true: clear the bit (the second chance) and go on;
+ *   - referenced == false: this is the victim.
+ * The hand stops one frame past the victim, so the new page is the last one
+ * the hand will look at again. The reference bit is set by mem_access() on a
+ * hit and by mem_install() when the page arrives.
+ * mem.h guarantees at least one evictable frame, so after at most one full
+ * turn every evictable bit is clear and the second turn finds a victim. */
+static int clock_hand = 0;
+
+static void clock_init(void) { clock_hand = 0; }
+
+static int clock_victim(void)
+{
+    for (int step = 0; step < 2 * nframes; step++) {
+        int f = clock_hand;
+        clock_hand = (clock_hand + 1) % nframes;
+        if (!frames[f].used || frames[f].loading) continue;
+        if (frames[f].referenced) { frames[f].referenced = false; continue; }
+        return f;
+    }
+    return -1;   /* no evictable frame; mem_access() reports it */
+}
+
+static void clock_on_hit(int f)     { (void)f; }   /* bit set by mem_access() */
+static void clock_on_install(int f) { (void)f; }   /* bit set by mem_install() */
+
+static replacer_t rep_clock = { "clock", clock_init, clock_victim, clock_on_hit, clock_on_install };
 
 static replacer_t *all[] = { &rep_fifo, &rep_lru, &rep_clock };
 

@@ -1,4 +1,5 @@
 build/
 ossim
+wlgen
 *.o
 *.csv

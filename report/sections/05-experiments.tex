@@ -1,0 +1,135 @@
+% --- V. Experiments ---
+% El enunciado pide al menos tres experimentos, cada uno con: pregunta,
+% método, gráfica o tabla, y discusión. El experimento del tema cuenta como
+% uno de los tres (está en 06-theme.tex).
+% Las gráficas leen data/*.csv, generados por ossim/experiments/*.sh.
+\section{Experiments}
+\label{sec:experiments}
+In this section, we use the simulator as an instrument to answer questions about the behavior of the system. Each experiment has a question, a method, a plot and a discussion. All experiments use workloads made by \texttt{wlgen} with seeds 1 to 10, so they can be repeated exactly. With a single workload, a result could depend on chance, so every value is the average over the ten seeds. The scripts are in \texttt{ossim/experiments/}, and the commands are in Appendix~\ref{app:commands}.
+
+% ------------------------------------------------------------------
+\subsection{Experiment 1: Schedulers under Varying I/O Intensity}
+
+\textbf{Question.} How do the waiting time and the response time of the six schedulers change when processes do more I/O?
+
+\textbf{Method.} Each workload has 10 processes with 4 CPU bursts of 6 ticks on average, arriving every 3 ticks on average. The I/O intensity $P$ is the percentage of gaps between two bursts in which the process blocks; half of these blocks are disk requests and half are generic I/O of 6 ticks on average. $P$ takes the values 0, 25, 50, 75 and 100. Every scheduler runs every workload with $q = 4$ and \texttt{--no-paging}, so only the CPU scheduler changes between runs.
+
+\textbf{Results.} Fig.~\ref{fig:exp1_wait} shows the average waiting time and Fig.~\ref{fig:exp1_resp} the average response time.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+    \begin{axis}[expplot,
+        xlabel={I/O intensity $P$ (\%)},
+        ylabel={Avg. waiting time (ticks)},
+        xtick={0,25,50,75,100},
+        legend columns=3,
+        legend style={at={(0.5,1.03)}, anchor=south},
+    ]
+        \addplot[blue,   mark=*]        table[x=io, y=fcfs, col sep=comma] {data/exp1_waiting.csv};
+        \addplot[red,    mark=square*]  table[x=io, y=rr,   col sep=comma] {data/exp1_waiting.csv};
+        \addplot[green!50!black, mark=triangle*] table[x=io, y=sjf,  col sep=comma] {data/exp1_waiting.csv};
+        \addplot[orange, mark=diamond*] table[x=io, y=srtf, col sep=comma] {data/exp1_waiting.csv};
+        \addplot[violet, mark=pentagon*] table[x=io, y=prio, col sep=comma] {data/exp1_waiting.csv};
+        \addplot[gray,   mark=o]        table[x=io, y=mlfq, col sep=comma] {data/exp1_waiting.csv};
+        \legend{FCFS, RR, SJF, SRTF, PRIO, MLFQ}
+    \end{axis}
+    \end{tikzpicture}
+    \caption{Average waiting time of the six schedulers as I/O intensity grows.}
+    \label{fig:exp1_wait}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+    \begin{axis}[expplot,
+        xlabel={I/O intensity $P$ (\%)},
+        ylabel={Avg. response time (ticks)},
+        xtick={0,25,50,75,100},
+        legend columns=3,
+        legend style={at={(0.5,1.03)}, anchor=south},
+    ]
+        \addplot[blue,   mark=*]        table[x=io, y=fcfs, col sep=comma] {data/exp1_response.csv};
+        \addplot[red,    mark=square*]  table[x=io, y=rr,   col sep=comma] {data/exp1_response.csv};
+        \addplot[green!50!black, mark=triangle*] table[x=io, y=sjf,  col sep=comma] {data/exp1_response.csv};
+        \addplot[orange, mark=diamond*] table[x=io, y=srtf, col sep=comma] {data/exp1_response.csv};
+        \addplot[violet, mark=pentagon*] table[x=io, y=prio, col sep=comma] {data/exp1_response.csv};
+        \addplot[gray,   mark=o]        table[x=io, y=mlfq, col sep=comma] {data/exp1_response.csv};
+        \legend{FCFS, RR, SJF, SRTF, PRIO, MLFQ}
+    \end{axis}
+    \end{tikzpicture}
+    \caption{Average response time of the six schedulers as I/O intensity grows.}
+    \label{fig:exp1_resp}
+\end{figure}
+
+\textbf{Discussion.} The results show a clear trade-off between waiting time and response time:
+\begin{itemize}
+    \item \textbf{Waiting time.} SJF and SRTF have the lowest waiting time at every level of I/O (about 86 to 110 ticks), as the theory predicts~\cite[Sec.~5.3.2]{silberschatz}. RR and MLFQ have the highest (about 145 to 160 ticks), because time slicing keeps every process in the ready queue for longer before it finishes.
+    \item \textbf{FCFS and I/O.} The waiting time of FCFS grows from 93 to 148 ticks as $P$ grows. Every time a process comes back from I/O, it joins the end of the queue and may wait behind a long burst again. This is the convoy effect.
+    \item \textbf{Response time.} RR and MLFQ have the lowest response time (about 9 to 16 ticks), because a new process gets the CPU after at most a few quanta. With little I/O, FCFS and SJF have the highest response time (93 and 86 ticks at $P=0$). With a lot of I/O, PRIO has the highest (42 ticks at $P=100$), because a process with a low priority can wait a long time for its first turn.
+    \item \textbf{Effect of I/O on FCFS response.} The response time of FCFS falls from 93 to 21 ticks as $P$ grows. With more I/O, the running process blocks sooner and frees the CPU, so new processes start earlier.
+\end{itemize}
+In summary, no scheduler is best for both metrics. SJF and SRTF are best for throughput-oriented work, and RR and MLFQ are best for interactive work. MLFQ gets a response time as low as RR (even slightly lower) without any knowledge of burst lengths.
+
+% ------------------------------------------------------------------
+\subsection{Experiment 2: Page Faults and the Onset of Thrashing}
+
+\textbf{Question.} How do the page-fault rate and the CPU utilization change as the number of frames shrinks, and when does thrashing start?
+
+\textbf{Method.} Each workload has 8 processes with 16 pages each, so the total address space is 128 pages. Every process has 4 CPU bursts of 30 ticks on average, and only 10\% of the gaps between bursts block on I/O, so most blocking comes from page faults. The references follow a random walk: 70\% of them move at most one page from the previous one, and the rest jump to any page. The number of frames goes from 128 down to 4, with FIFO, LRU and Clock. All runs use RR ($q=4$) and the FCFS disk, and stop after 20\,000 ticks if they have not finished.
+
+The fault rate is the number of page faults per executed reference. It can be larger than 1: when a newly loaded page is evicted before its owner uses it, the same reference faults again.
+
+\textbf{Results.} Fig.~\ref{fig:exp2_util} shows the CPU utilization (ticks of user work over all ticks) and Fig.~\ref{fig:exp2_fault} the fault rate. The x axis is logarithmic.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+    \begin{axis}[expplot,
+        xmode=log, log basis x=2,
+        xlabel={Frames},
+        ylabel={CPU utilization (\%)},
+        xtick={4,8,16,32,64,128},
+        xticklabels={4,8,16,32,64,128},
+        ymin=0,
+        legend pos=north west,
+    ]
+        \addplot[blue,   mark=*]        table[x=frames, y=fifo,  col sep=comma] {data/exp2_util.csv};
+        \addplot[red,    mark=square*]  table[x=frames, y=lru,   col sep=comma] {data/exp2_util.csv};
+        \addplot[green!50!black, mark=triangle*] table[x=frames, y=clock, col sep=comma] {data/exp2_util.csv};
+        \legend{FIFO, LRU, Clock}
+    \end{axis}
+    \end{tikzpicture}
+    \caption{CPU utilization as the number of frames shrinks.}
+    \label{fig:exp2_util}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+    \begin{axis}[expplot,
+        xmode=log, log basis x=2,
+        ymode=log,
+        xlabel={Frames},
+        ylabel={Page faults per reference},
+        xtick={4,8,16,32,64,128},
+        xticklabels={4,8,16,32,64,128},
+        legend pos=north east,
+    ]
+        \addplot[blue,   mark=*]        table[x=frames, y=fifo,  col sep=comma] {data/exp2_faultrate.csv};
+        \addplot[red,    mark=square*]  table[x=frames, y=lru,   col sep=comma] {data/exp2_faultrate.csv};
+        \addplot[green!50!black, mark=triangle*] table[x=frames, y=clock, col sep=comma] {data/exp2_faultrate.csv};
+        \legend{FIFO, LRU, Clock}
+    \end{axis}
+    \end{tikzpicture}
+    \caption{Page-fault rate as the number of frames shrinks (log scale on both axes).}
+    \label{fig:exp2_fault}
+\end{figure}
+
+\textbf{Discussion.}
+\begin{itemize}
+    \item \textbf{Enough memory.} With 128 frames every page fits, and the only faults are the first reference to each page (compulsory faults). The fault rate is 0.13 and the utilization is 66\%.
+    \item \textbf{Onset of thrashing.} The largest drop happens between 96 and 64 frames: the utilization falls from about 62\% to about 44\%, and the fault rate goes from 0.17 to 0.28. From 32 frames down, the processes spend most of their time waiting for the disk, and the utilization is about 28\% or less.
+    \item \textbf{Collapse.} With 4 frames the fault rate jumps to 2.6, so most references fault more than once, and 9\% of the processes do not finish within 20\,000 ticks. Here a page is often evicted by another process before its owner can use it. This is thrashing in its extreme form~\cite[Sec.~10.6]{silberschatz}.
+    \item \textbf{Policies.} FIFO, LRU and Clock give almost the same results. The random-walk references of the generator have little reuse that LRU can exploit better than FIFO. On the textbook string, which has more reuse, LRU is clearly better (12 faults against 15). When memory is too small, no replacement policy can help: the problem is the number of processes, not the choice of victim. This is the motivation for load control with the working-set model.
+\end{itemize}

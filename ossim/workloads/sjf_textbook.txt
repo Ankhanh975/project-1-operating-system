@@ -1,0 +1,23 @@
+# Textbook example (Silberschatz Sec. 5.3.2): four CPU-only processes
+# arriving at t=0 with bursts 6, 8, 7, 3.
+#   SJF       : order P4, P1, P3, P2
+#               Gantt [0-3] P4 | [3-9] P1 | [9-16] P3 | [16-24] P2
+#               waiting 3, 16, 9, 0  -> average 7.00
+# Run with --no-paging so that the numbers depend on the CPU scheduler only:
+#   ./ossim workloads/sjf_textbook.txt --sched sjf --no-paging --gantt
+
+process P1 arrive=0 pages=1
+    cpu 6
+end
+
+process P2 arrive=0 pages=1
+    cpu 8
+end
+
+process P3 arrive=0 pages=1
+    cpu 7
+end
+
+process P4 arrive=0 pages=1
+    cpu 3
+end
