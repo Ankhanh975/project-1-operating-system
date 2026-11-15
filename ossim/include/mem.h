@@ -18,8 +18,8 @@
  * can be used and tries again (see kernel.c), so victim() is only called
  * when at least one frame has used && !loading.
  *
- * A replacement policy is a replacer_t. Given: FIFO.
- * TODO checkpoint 2: LRU (with timestamps) and Clock (second chance).
+ * A replacement policy is a replacer_t: FIFO (given), LRU (timestamps) and
+ * Clock (second chance), selected with --replace.
  */
 #ifndef OSSIM_MEM_H
 #define OSSIM_MEM_H
