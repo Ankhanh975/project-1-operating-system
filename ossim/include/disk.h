@@ -22,7 +22,7 @@
  * called, which means "go straight to the request". The head movement is
  * head -> via[0] -> via[1] -> cylinder.
  *
- * Given: FCFS. TODO checkpoint 2: SSTF, SCAN, C-LOOK.
+ * Policies: FCFS (given), SSTF, SCAN and C-LOOK, selected with --disk.
  */
 #ifndef OSSIM_DISK_H
 #define OSSIM_DISK_H
