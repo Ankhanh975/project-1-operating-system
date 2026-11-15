@@ -1,0 +1,274 @@
+﻿Checkpoint 1 build and run log
+Generated: 2026-11-15 19:36:14 +07:00
+Repository: C:\src\project-1-operating system\project-1-operating-system
+
+=== BUILD ===
+COMMAND: call "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat" >nul && cd /d "C:\src\project-1-operating system\project-1-operating-system\ossim" && cl /nologo /std:c11 /W4 /WX /D_CRT_SECURE_NO_WARNINGS /Iinclude src\*.c /Fe:ossim.exe
+disk.c
+event.c
+kernel.c
+main.c
+mem.c
+metrics.c
+process.c
+queue.c
+sched.c
+sync.c
+util.c
+workload.c
+Generating Code...
+EXIT_CODE: 0
+
+=== COMPLETE REGRESSION SUITE ===
+COMMAND: wsl.exe -d Ubuntu --cd <ossim> -- sh tests/run.sh
+PASS  FCFS textbook example: avg waiting 17.00
+PASS  RR q=4 textbook example: avg waiting 5.67
+PASS  RR q=4: context switches = 4 (P1,P2,P3,P1)
+PASS  Paging: P1 alone, FIFO, 3 frames -> 15 faults (textbook Sec. 10.4.2)
+PASS  Disk: FCFS, head 53 -> 640 cylinders (textbook Sec. 11.2.1)
+PASS  Producer/consumer completes
+PASS  Deadlock workload without detection: A and B stall, C finishes
+PASS  Mixed workload finishes
+PASS  Mixed workload finishes with 1 frame (faults wait for a frame)
+PASS  Deadlock detection reports A and B (pids 1 2)
+PASS  Multi-instance deadlock reports A and B
+PASS  FCFS arrivals: waiting 14.83, response 10.17
+PASS  FCFS arrivals: starts J1 and runs through t=6
+PASS  RR q=2 arrivals: waiting 18.33, response 3.17
+PASS  RR q=2 arrivals: first slice is J1
+PASS  SJF arrivals: waiting 10.00, response 9.00
+PASS  SJF arrivals: first job runs non-preemptively
+PASS  SRTF arrivals: waiting 9.83, response 9.00
+PASS  SRTF arrivals: equal remaining time does not preempt J1
+PASS  SRTF arrivals: J3 preempts J5 when strictly shorter
+PASS  PRIO arrivals: waiting 12.83, response 8.33
+PASS  PRIO arrivals: highest-priority J2 preempts J1
+PASS  MLFQ arrivals: waiting 15.00, response 0.00
+PASS  MLFQ arrivals: starts with J1 at level 0
+PASS  MLFQ arrivals: tick-20 boost resets the running quantum
+PASS  PRIO q=2 rotates equal priorities
+PASS  PRIO q=2 tie order is round robin
+PASS  Producer/consumer completes under sjf
+PASS  Producer/consumer completes under srtf
+PASS  Producer/consumer completes under prio
+PASS  Producer/consumer completes under mlfq
+SKIP  Paging: LRU, 3 frames -> 12 faults (textbook Sec. 10.4.4)
+SKIP  Disk: SSTF, head 53 -> 236
+SKIP  Disk: SCAN moving down, head 53 -> 236
+SKIP  Disk: C-LOOK moving up, head 53 -> 322
+---
+31 passed, 4 skipped (not implemented yet), 0 failed
+EXIT_CODE: 0
+
+=== FCFS arrivals comparison ===
+COMMAND: wsl.exe -d Ubuntu --cd <ossim> -- ./ossim.exe workloads/arrivals.txt --sched fcfs --no-paging --gantt
+
+=== ossim report: workloads/arrivals.txt | sched=fcfs q=4 | paging=off frames=64 replace=fifo | disk=fcfs cyl=200 head0=0 ===
+pid  name        arrive   first  finish turnaround  waiting response    cpu faults   disk
+1    J1               0       0      30         30       16        0     11      0      0
+2    J2               2       7      16         14        5        5      9      0      0
+3    J3               4      16      39         35       24       12      6      0      0
+4    J4               6      19      21         15       13       13      2      0      0
+5    J5               8      21      26         18       13       13      5      0      0
+6    J6              12      30      36         24       18       18      6      0      0
+
+CPU timeline (pid, 0 = idle, K = kernel/page-fault handling):
+  [0-6] P1 | [7-15] P2 | [16-18] P3 | [19-20] P4 | [21-25] P5 | [26-29] P1 | [30-35] P6 | [36-38] P3 | 
+
+summary
+  ticks=39 finished=6/6 aborted=0
+  cpu_busy=39 cpu_idle=0 cpu_kernel=0 utilization=100.00%
+  throughput=0.1538 procs/tick context_switches=8
+  avg_turnaround=22.67 avg_waiting=14.83 avg_response=10.17
+  mem_refs=0 page_faults=0 evictions=0 fault_rate=0.0000 frame_waits=0
+  disk_requests=0 head_movement=0 avg_disk_wait=0.00 head=0
+  avg_fault_service=0.00
+EXIT_CODE: 0
+
+=== RR arrivals comparison ===
+COMMAND: wsl.exe -d Ubuntu --cd <ossim> -- ./ossim.exe workloads/arrivals.txt --sched rr --quantum 2 --no-paging --gantt
+
+=== ossim report: workloads/arrivals.txt | sched=rr q=2 | paging=off frames=64 replace=fifo | disk=fcfs cyl=200 head0=0 ===
+pid  name        arrive   first  finish turnaround  waiting response    cpu faults   disk
+1    J1               0       0      39         39       25        0     11      0      0
+2    J2               2       2      34         32       23        0      9      0      0
+3    J3               4       6      37         33       22        2      6      0      0
+4    J4               6      10      12          6        4        4      2      0      0
+5    J5               8      14      31         23       18        6      5      0      0
+6    J6              12      19      36         24       18        7      6      0      0
+
+CPU timeline (pid, 0 = idle, K = kernel/page-fault handling):
+  [0-1] P1 | [2-3] P2 | [4-5] P1 | [6-7] P3 | [8-9] P2 | [10-11] P4 | [12-13] P1 | [14-15] P5 | [16-16] P3 | [17-18] P2 | [19-20] P6 | [21-21] P1 | [22-23] P5 | [24-25] P2 | [26-27] P6 | [28-29] P3 | [30-30] P5 | [31-32] P1 | [33-33] P2 | [34-35] P6 | [36-36] P3 | [37-38] P1 | 
+
+summary
+  ticks=39 finished=6/6 aborted=0
+  cpu_busy=39 cpu_idle=0 cpu_kernel=0 utilization=100.00%
+  throughput=0.1538 procs/tick context_switches=22
+  avg_turnaround=26.17 avg_waiting=18.33 avg_response=3.17
+  mem_refs=0 page_faults=0 evictions=0 fault_rate=0.0000 frame_waits=0
+  disk_requests=0 head_movement=0 avg_disk_wait=0.00 head=0
+  avg_fault_service=0.00
+EXIT_CODE: 0
+
+=== SJF arrivals comparison ===
+COMMAND: wsl.exe -d Ubuntu --cd <ossim> -- ./ossim.exe workloads/arrivals.txt --sched sjf --no-paging --gantt
+
+=== ossim report: workloads/arrivals.txt | sched=sjf q=4 | paging=off frames=64 replace=fifo | disk=fcfs cyl=200 head0=0 ===
+pid  name        arrive   first  finish turnaround  waiting response    cpu faults   disk
+1    J1               0       0      16         16        2        0     11      0      0
+2    J2               2      30      39         37       28       28      9      0      0
+3    J3               4       9      24         20        9        5      6      0      0
+4    J4               6       7       9          3        1        1      2      0      0
+5    J5               8      16      21         13        8        8      5      0      0
+6    J6              12      24      30         18       12       12      6      0      0
+
+CPU timeline (pid, 0 = idle, K = kernel/page-fault handling):
+  [0-6] P1 | [7-8] P4 | [9-11] P3 | [12-15] P1 | [16-20] P5 | [21-23] P3 | [24-29] P6 | [30-38] P2 | 
+
+summary
+  ticks=39 finished=6/6 aborted=0
+  cpu_busy=39 cpu_idle=0 cpu_kernel=0 utilization=100.00%
+  throughput=0.1538 procs/tick context_switches=8
+  avg_turnaround=17.83 avg_waiting=10.00 avg_response=9.00
+  mem_refs=0 page_faults=0 evictions=0 fault_rate=0.0000 frame_waits=0
+  disk_requests=0 head_movement=0 avg_disk_wait=0.00 head=0
+  avg_fault_service=0.00
+EXIT_CODE: 0
+
+=== SRTF arrivals comparison ===
+COMMAND: wsl.exe -d Ubuntu --cd <ossim> -- ./ossim.exe workloads/arrivals.txt --sched srtf --no-paging --gantt
+
+=== ossim report: workloads/arrivals.txt | sched=srtf q=4 | paging=off frames=64 replace=fifo | disk=fcfs cyl=200 head0=0 ===
+pid  name        arrive   first  finish turnaround  waiting response    cpu faults   disk
+1    J1               0       0      16         16        2        0     11      0      0
+2    J2               2      30      39         37       28       28      9      0      0
+3    J3               4       9      20         16        5        5      6      0      0
+4    J4               6       7       9          3        1        1      2      0      0
+5    J5               8      16      24         16       11        8      5      0      0
+6    J6              12      24      30         18       12       12      6      0      0
+
+CPU timeline (pid, 0 = idle, K = kernel/page-fault handling):
+  [0-6] P1 | [7-8] P4 | [9-11] P3 | [12-15] P1 | [16-16] P5 | [17-19] P3 | [20-23] P5 | [24-29] P6 | [30-38] P2 | 
+
+summary
+  ticks=39 finished=6/6 aborted=0
+  cpu_busy=39 cpu_idle=0 cpu_kernel=0 utilization=100.00%
+  throughput=0.1538 procs/tick context_switches=9
+  avg_turnaround=17.67 avg_waiting=9.83 avg_response=9.00
+  mem_refs=0 page_faults=0 evictions=0 fault_rate=0.0000 frame_waits=0
+  disk_requests=0 head_movement=0 avg_disk_wait=0.00 head=0
+  avg_fault_service=0.00
+EXIT_CODE: 0
+
+=== Priority arrivals comparison ===
+COMMAND: wsl.exe -d Ubuntu --cd <ossim> -- ./ossim.exe workloads/arrivals.txt --sched prio --quantum 2 --no-paging --gantt
+
+=== ossim report: workloads/arrivals.txt | sched=prio q=2 | paging=off frames=64 replace=fifo | disk=fcfs cyl=200 head0=0 ===
+pid  name        arrive   first  finish turnaround  waiting response    cpu faults   disk
+1    J1               0       0      31         31       17        0     11      0      0
+2    J2               2       2      11          9        0        0      9      0      0
+3    J3               4      24      40         36       25       20      6      0      0
+4    J4               6      18      20         14       12       12      2      0      0
+5    J5               8      26      36         28       23       18      5      0      0
+6    J6              12      12      18          6        0        0      6      0      0
+
+CPU timeline (pid, 0 = idle, K = kernel/page-fault handling):
+  [0-1] P1 | [2-10] P2 | [11-11] P1 | [12-17] P6 | [18-19] P4 | [20-23] P1 | [24-25] P3 | [26-26] P5 | [27-30] P1 | [31-31] P3 | [32-35] P5 | [36-36] idle | [37-39] P3 | 
+
+summary
+  ticks=40 finished=6/6 aborted=0
+  cpu_busy=39 cpu_idle=1 cpu_kernel=0 utilization=97.50%
+  throughput=0.1500 procs/tick context_switches=12
+  avg_turnaround=20.67 avg_waiting=12.83 avg_response=8.33
+  mem_refs=0 page_faults=0 evictions=0 fault_rate=0.0000 frame_waits=0
+  disk_requests=0 head_movement=0 avg_disk_wait=0.00 head=0
+  avg_fault_service=0.00
+EXIT_CODE: 0
+
+=== MLFQ arrivals comparison ===
+COMMAND: wsl.exe -d Ubuntu --cd <ossim> -- ./ossim.exe workloads/arrivals.txt --sched mlfq --quantum 2 --no-paging --gantt
+
+=== ossim report: workloads/arrivals.txt | sched=mlfq q=2 | paging=off frames=64 replace=fifo | disk=fcfs cyl=200 head0=0 ===
+pid  name        arrive   first  finish turnaround  waiting response    cpu faults   disk
+1    J1               0       0      39         39       25        0     11      0      0
+2    J2               2       2      35         33       24        0      9      0      0
+3    J3               4       4      31         27       16        0      6      0      0
+4    J4               6       6       8          2        0        0      2      0      0
+5    J5               8       8      22         14        9        0      5      0      0
+6    J6              12      12      34         22       16        0      6      0      0
+
+CPU timeline (pid, 0 = idle, K = kernel/page-fault handling):
+  [0-1] P1 | [2-3] P2 | [4-5] P3 | [6-7] P4 | [8-9] P5 | [10-11] P1 | [12-13] P6 | [14-17] P2 | [18-18] P3 | [19-21] P5 | [22-23] P1 | [24-25] P6 | [26-27] P2 | [28-30] P3 | [31-31] P1 | [32-33] P6 | [34-34] P2 | [35-38] P1 | 
+
+summary
+  ticks=39 finished=6/6 aborted=0
+  cpu_busy=39 cpu_idle=0 cpu_kernel=0 utilization=100.00%
+  throughput=0.1538 procs/tick context_switches=18
+  avg_turnaround=22.83 avg_waiting=15.00 avg_response=0.00
+  mem_refs=0 page_faults=0 evictions=0 fault_rate=0.0000 frame_waits=0
+  disk_requests=0 head_movement=0 avg_disk_wait=0.00 head=0
+  avg_fault_service=0.00
+EXIT_CODE: 0
+
+=== Equal-priority RR tie case ===
+COMMAND: wsl.exe -d Ubuntu --cd <ossim> -- ./ossim.exe workloads/prio_ties.txt --sched prio --quantum 2 --no-paging --gantt
+
+=== ossim report: workloads/prio_ties.txt | sched=prio q=2 | paging=off frames=64 replace=fifo | disk=fcfs cyl=200 head0=0 ===
+pid  name        arrive   first  finish turnaround  waiting response    cpu faults   disk
+1    P1               0       0       9          9        4        0      5      0      0
+2    P2               0       2      10         10        5        2      5      0      0
+
+CPU timeline (pid, 0 = idle, K = kernel/page-fault handling):
+  [0-1] P1 | [2-3] P2 | [4-5] P1 | [6-7] P2 | [8-8] P1 | [9-9] P2 | 
+
+summary
+  ticks=10 finished=2/2 aborted=0
+  cpu_busy=10 cpu_idle=0 cpu_kernel=0 utilization=100.00%
+  throughput=0.2000 procs/tick context_switches=6
+  avg_turnaround=9.50 avg_waiting=4.50 avg_response=1.00
+  mem_refs=0 page_faults=0 evictions=0 fault_rate=0.0000 frame_waits=0
+  disk_requests=0 head_movement=0 avg_disk_wait=0.00 head=0
+  avg_fault_service=0.00
+EXIT_CODE: 0
+
+=== Single-instance deadlock detection ===
+COMMAND: wsl.exe -d Ubuntu --cd <ossim> -- ./ossim.exe workloads/deadlock.txt --sched rr --quantum 2 --deadlock-every 5 --max-ticks 60 --no-paging
+DEADLOCK t=15 pids: 1 2
+WARNING: 2 of 3 processes did not finish within 60 ticks (deadlock? starvation? --max-ticks too small?)
+
+=== ossim report: workloads/deadlock.txt | sched=rr q=2 | paging=off frames=64 replace=fifo | disk=fcfs cyl=200 head0=0 ===
+pid  name        arrive   first  finish turnaround  waiting response    cpu faults   disk
+1    A                0       0      -1         -1        8        0      5      0      0  (unfinished)
+2    B                1       4      -1         -1        7        3      4      0      0  (unfinished)
+3    C                0       2      15         15        9        2      6      0      0
+
+summary
+  ticks=60 finished=1/3 aborted=0
+  cpu_busy=15 cpu_idle=45 cpu_kernel=0 utilization=25.00%
+  throughput=0.0167 procs/tick context_switches=8
+  avg_turnaround=15.00 avg_waiting=9.00 avg_response=2.00
+  mem_refs=0 page_faults=0 evictions=0 fault_rate=0.0000 frame_waits=0
+  disk_requests=0 head_movement=0 avg_disk_wait=0.00 head=0
+  avg_fault_service=0.00
+EXIT_CODE: 0
+
+=== Multi-instance deadlock detection ===
+COMMAND: wsl.exe -d Ubuntu --cd <ossim> -- ./ossim.exe workloads/deadlock_multi.txt --deadlock-every 1 --max-ticks 10 --no-paging
+DEADLOCK t=1 pids: 1 2
+WARNING: 2 of 2 processes did not finish within 10 ticks (deadlock? starvation? --max-ticks too small?)
+
+=== ossim report: workloads/deadlock_multi.txt | sched=fcfs q=4 | paging=off frames=64 replace=fifo | disk=fcfs cyl=200 head0=0 ===
+pid  name        arrive   first  finish turnaround  waiting response    cpu faults   disk
+1    A                0       0      -1         -1        0        0      1      0      0  (unfinished)
+2    B                0       1      -1         -1        1        1      1      0      0  (unfinished)
+
+summary
+  ticks=10 finished=0/2 aborted=0
+  cpu_busy=2 cpu_idle=8 cpu_kernel=0 utilization=20.00%
+  throughput=0.0000 procs/tick context_switches=2
+  mem_refs=0 page_faults=0 evictions=0 fault_rate=0.0000 frame_waits=0
+  disk_requests=0 head_movement=0 avg_disk_wait=0.00 head=0
+  avg_fault_service=0.00
+EXIT_CODE: 0
+
+The four checkpoint-2 paging/disk skips are outside the requested Checkpoint 1 scope.

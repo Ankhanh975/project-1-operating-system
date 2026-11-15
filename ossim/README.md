@@ -32,12 +32,12 @@ synchronization:
 - hand-computed workload tests and a short design note
 
 Paging replacement, disk scheduling, workload generation, and the project
-theme are later phases. The corresponding files remain scaffolded and should
-not be implemented as part of this preliminary setup.
+theme are later phases. Their existing implementations and tests are outside
+the current checkpoint.
 
 ## Project structure
 
-| File | What to write |
+| File | Responsibility |
 |---|---|
 | `include/process.h` | PCB fields shared by all schedulers and synchronization |
 | `include/queue.h` | FIFO ready/waiting queues and min-key operations |
@@ -55,12 +55,12 @@ hooks. The workload format is in `include/workload.h`. Keep the existing
 `scheduler_t` and synchronization APIs stable so the kernel remains policy
 independent.
 
-## Preliminary status
+## Checkpoint 1 status
 
-FCFS, RR, semaphore operations, resource allocation, and the simulator
-integration are present in the scaffold. The Checkpoint 1 policies and
-`deadlock_check()` still report that they are not implemented; this is
-deliberate until the design and hand-computed expected values are reviewed.
+FCFS, RR, SJF, SRTF, preemptive priority, MLFQ, semaphore operations, resource
+allocation, and multi-instance deadlock detection are implemented. The
+hand-computed scheduler comparison and regression results are documented in
+[`CHECKPOINT1.md`](CHECKPOINT1.md).
 
-`make test` prints SKIP for a policy that is not written yet, and PASS or
-FAIL once it is.
+Paging replacement and disk scheduling remain outside this checkpoint even
+though they are retained in the simulator for the existing regression suite.

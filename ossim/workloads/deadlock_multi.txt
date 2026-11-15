@@ -1,0 +1,21 @@
+# Multi-instance deadlock: each process holds both instances of one resource
+# and waits for one instance of the other resource.
+
+resource R1 2
+resource R2 2
+
+process A arrive=0 pages=1
+    acquire R1 2
+    cpu 1
+    acquire R2 1
+    release R2 1
+    release R1 2
+end
+
+process B arrive=0 pages=1
+    acquire R2 2
+    cpu 1
+    acquire R1 1
+    release R1 1
+    release R2 2
+end

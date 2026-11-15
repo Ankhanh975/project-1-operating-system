@@ -111,22 +111,8 @@ void res_release(pcb_t *p, resource_t *r, int n)
     }
 }
 
-/*
- * TODO checkpoint 1: deadlock detection.
- * The kernel calls this every cfg.deadlock_interval ticks (never if it is 0).
- * Two ways to do it, choose one:
- *   - Wait-for graph (one instance per resource): build it from
- *     resources[].waiters, requested[] and allocated[]. A cycle is a deadlock.
- *   - Detection algorithm of Sec. 8.6.2 (several instances), with
- *     Available = r->available, Allocation = r->allocated and
- *     Request = r->requested.
- * Print the deadlocked processes in exactly this format, pids from small to
- * large, because tests/run.sh looks for it:
- *     DEADLOCK t=<now> pids: 1 2
- * After that you can kill a victim with kernel_abort(p) (see kernel.h) or
- * only report it and let --max-ticks end the run. If you only report, print
- * each deadlock once. workloads/deadlock.txt must be detected.
- */
+/* Apply the multi-instance detection algorithm without mutating resource state.
+ * A changed deadlocked set is reported once, in ascending PID order. */
 void deadlock_check(void)
 {
     int work[MAX_RES];

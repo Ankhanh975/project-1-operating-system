@@ -1,7 +1,5 @@
 #!/bin/sh
-# Tests against hand-computed textbook numbers. Extend this file as you
-# implement policies (e.g. SJF/SRTF/PRIO/MLFQ on arrivals.txt, your own
-# paging and disk workloads).
+# Tests against hand-computed textbook and checkpoint numbers.
 #
 # A check whose command stops with "not implemented yet" prints SKIP: the
 # expected value is already here, waiting for your implementation. Every SKIP
@@ -15,6 +13,18 @@ check() {   # check <description> <command> <expected-word>
         echo "SKIP  $1"; skip=$((skip + 1))
     elif echo "$out" | grep -qw -- "$3"; then
         echo "PASS  $1"; pass=$((pass + 1))
+    else
+        echo "FAIL  $1"; echo "      expected: $3"; echo "$out" | sed 's/^/      /'; fail=1
+    fi
+}
+
+check_contains() {   # check_contains <description> <command> <expected-text>
+    out=$($2 2>&1) || true
+    if echo "$out" | grep -q "not implemented yet"; then
+        echo "SKIP  $1"; skip=$((skip + 1))
+    elif echo "$out" | grep -Fq -- "$3"; then
+        echo "PASS  $1"
+        pass=$((pass + 1))
     else
         echo "FAIL  $1"; echo "      expected: $3"; echo "$out" | sed 's/^/      /'; fail=1
     fi
@@ -52,12 +62,54 @@ check "Mixed workload finishes with 1 frame (faults wait for a frame)" \
 check "Deadlock detection reports A and B (pids 1 2)" \
       "$BIN workloads/deadlock.txt --sched rr --quantum 2 --deadlock-every 5 --max-ticks 60 --no-paging" "pids: 1 2"
 
+check "Multi-instance deadlock reports A and B" \
+      "$BIN workloads/deadlock_multi.txt --deadlock-every 1 --max-ticks 10 --no-paging" "pids: 1 2"
+
+# Hand-computed results for arrivals.txt; compare waiting/response, dispatch
+# behavior, and Gantt segments rather than merely checking termination.
+check "FCFS arrivals: waiting 14.83, response 10.17" \
+      "$BIN workloads/arrivals.txt --sched fcfs --no-paging --gantt" "avg_waiting=14.83 avg_response=10.17"
+check_contains "FCFS arrivals: starts J1 and runs through t=6" \
+      "$BIN workloads/arrivals.txt --sched fcfs --no-paging --gantt" "[0-6] P1"
+
+check "RR q=2 arrivals: waiting 18.33, response 3.17" \
+      "$BIN workloads/arrivals.txt --sched rr --quantum 2 --no-paging --gantt" "avg_waiting=18.33 avg_response=3.17"
+check_contains "RR q=2 arrivals: first slice is J1" \
+      "$BIN workloads/arrivals.txt --sched rr --quantum 2 --no-paging --gantt" "[0-1] P1"
+
+check "SJF arrivals: waiting 10.00, response 9.00" \
+      "$BIN workloads/arrivals.txt --sched sjf --no-paging --gantt" "avg_waiting=10.00 avg_response=9.00"
+check_contains "SJF arrivals: first job runs non-preemptively" \
+      "$BIN workloads/arrivals.txt --sched sjf --no-paging --gantt" "[0-6] P1"
+
+check "SRTF arrivals: waiting 9.83, response 9.00" \
+      "$BIN workloads/arrivals.txt --sched srtf --no-paging --gantt" "avg_waiting=9.83 avg_response=9.00"
+check_contains "SRTF arrivals: equal remaining time does not preempt J1" \
+      "$BIN workloads/arrivals.txt --sched srtf --no-paging --gantt" "[0-6] P1"
+check_contains "SRTF arrivals: J3 preempts J5 when strictly shorter" \
+      "$BIN workloads/arrivals.txt --sched srtf --no-paging --gantt" "[16-16] P5 | [17-19] P3"
+
+check "PRIO arrivals: waiting 12.83, response 8.33" \
+      "$BIN workloads/arrivals.txt --sched prio --quantum 2 --no-paging --gantt" "avg_waiting=12.83 avg_response=8.33"
+check_contains "PRIO arrivals: highest-priority J2 preempts J1" \
+      "$BIN workloads/arrivals.txt --sched prio --quantum 2 --no-paging --gantt" "[0-1] P1"
+
+check "MLFQ arrivals: waiting 15.00, response 0.00" \
+      "$BIN workloads/arrivals.txt --sched mlfq --quantum 2 --no-paging --gantt" "avg_waiting=15.00 avg_response=0.00"
+check_contains "MLFQ arrivals: starts with J1 at level 0" \
+      "$BIN workloads/arrivals.txt --sched mlfq --quantum 2 --no-paging --gantt" "[0-1] P1"
+check_contains "MLFQ arrivals: tick-20 boost resets the running quantum" \
+      "$BIN workloads/arrivals.txt --sched mlfq --quantum 2 --no-paging --gantt" "[19-21] P5 | [22-23] P1"
+
+check "PRIO q=2 rotates equal priorities" \
+      "$BIN workloads/prio_ties.txt --sched prio --quantum 2 --no-paging --gantt" "avg_waiting=4.50 avg_response=1.00"
+check_contains "PRIO q=2 tie order is round robin" \
+      "$BIN workloads/prio_ties.txt --sched prio --quantum 2 --no-paging --gantt" "[0-1] P1 | [2-3] P2 | [4-5] P1"
+
 for s in sjf srtf prio mlfq; do
     check "Producer/consumer completes under $s" \
           "$BIN workloads/producer_consumer.txt --sched $s --quantum 2 --no-paging" "finished=2/2"
 done
-# TODO: add hand-computed avg_waiting / avg_response for every scheduler on
-# workloads/arrivals.txt (and show the Gantt chart in your design note).
 
 # --- checkpoint 2 ----------------------------------------------------------
 check "Paging: LRU, 3 frames -> 12 faults (textbook Sec. 10.4.4)" \

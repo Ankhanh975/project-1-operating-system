@@ -1,10 +1,8 @@
 /*
  * sched.c: CPU schedulers.
  *
- * FCFS and RR are given. SJF and SRTF remain checkpoint work; priority and
- * MLFQ are implemented below.
- * Each one is a scheduler_t with the same hooks as FCFS and RR. There are
- * notes above each stub. Functions you will probably need:
+ * FCFS, RR, SJF, SRTF, priority and MLFQ share the same scheduler hooks.
+ * Each policy uses the same scheduler_t hooks. Shared queue helpers include:
  *   proc_burst_remaining(p)   ticks left in p's current cpu burst
  *   proc_total_remaining(p)   cpu ticks left in the whole process
  *   q_pop_min(&q, key)        remove the element with the smallest key
@@ -57,20 +55,41 @@ static scheduler_t sched_rr = {
     rr_on_dispatch, rr_on_tick, rr_ready_count
 };
 
-/* SJF
- * TODO: shortest job first, non-preemptive.
- *   pick(): q_pop_min(&q, key) with key = proc_burst_remaining
- *   should_preempt(): always false
- * For your report: ossim knows the exact length of the next burst, a real
- * OS does not. How would you add exponential averaging (Sec. 5.3.2)? */
-static void sjf_init(void) { die("scheduler 'sjf' is not implemented yet (src/sched.c)"); }
-static scheduler_t sched_sjf = { "sjf", sjf_init, NULL, NULL, NULL, NULL, NULL, NULL };
+/* SJF selects the shortest ready CPU burst and never preempts. */
+static queue_t sjf_q;
+static int burst_key(const pcb_t *p) { return proc_burst_remaining(p); }
 
-/* SRTF
- * TODO: SJF with preemption. should_preempt(r) is true when a READY process
- * has less left of its burst than r, that is q_min_key(&q, key) < key(r). */
-static void srtf_init(void) { die("scheduler 'srtf' is not implemented yet (src/sched.c)"); }
-static scheduler_t sched_srtf = { "srtf", srtf_init, NULL, NULL, NULL, NULL, NULL, NULL };
+static void   sjf_init(void)            { q_init(&sjf_q); }
+static void   sjf_enqueue(pcb_t *p)     { q_push(&sjf_q, p); }
+static bool   sjf_should_preempt(pcb_t *r) { (void)r; return false; }
+static pcb_t *sjf_pick(void)            { return q_pop_min(&sjf_q, burst_key); }
+static void   sjf_on_dispatch(pcb_t *p) { (void)p; }
+static void   sjf_on_tick(pcb_t *p)     { (void)p; }
+static int    sjf_ready_count(void)     { return q_size(&sjf_q); }
+
+static scheduler_t sched_sjf = {
+    "sjf", sjf_init, sjf_enqueue, sjf_should_preempt, sjf_pick,
+    sjf_on_dispatch, sjf_on_tick, sjf_ready_count
+};
+
+/* SRTF preempts only when a ready burst is strictly shorter. */
+static queue_t srtf_q;
+
+static void   srtf_init(void)            { q_init(&srtf_q); }
+static void   srtf_enqueue(pcb_t *p)     { q_push(&srtf_q, p); }
+static bool   srtf_should_preempt(pcb_t *r)
+{
+    return !q_empty(&srtf_q) && q_min_key(&srtf_q, burst_key) < burst_key(r);
+}
+static pcb_t *srtf_pick(void)            { return q_pop_min(&srtf_q, burst_key); }
+static void   srtf_on_dispatch(pcb_t *p) { (void)p; }
+static void   srtf_on_tick(pcb_t *p)     { (void)p; }
+static int    srtf_ready_count(void)     { return q_size(&srtf_q); }
+
+static scheduler_t sched_srtf = {
+    "srtf", srtf_init, srtf_enqueue, srtf_should_preempt, srtf_pick,
+    srtf_on_dispatch, srtf_on_tick, srtf_ready_count
+};
 
 /* PRIO
  * Priority with preemption (smaller number = higher priority), and RR

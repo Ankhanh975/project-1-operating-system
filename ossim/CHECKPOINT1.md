@@ -1,4 +1,4 @@
-# Checkpoint 1 plan and design note
+# Checkpoint 1 implementation and design note
 
 ## Goal
 
@@ -7,9 +7,9 @@ without changing the public simulator interface. The simulator remains
 tick-driven: the kernel owns process state transitions and calls a selected
 policy through `scheduler_t`.
 
-The current implementation defines the structures, invariants, and validation
-plan, with priority scheduling, MLFQ, and multi-instance deadlock detection
-implemented. SJF and SRTF remain scaffolded for the next implementation step.
+Checkpoint 1 is implemented and validated. Scheduler policy state remains
+inside the scheduler module, while process-state transitions remain owned by
+the kernel.
 
 ## Scope
 
@@ -85,13 +85,13 @@ changing ownership or waking processes.
   running process.
 - Equal remaining times do not cause a context switch.
 
-### PRIO (implemented)
+### PRIO
 
 - Smaller `priority` values run first.
 - Preempt when a ready process has a strictly higher priority.
 - Equal priorities use round-robin behavior with `cfg.quantum`.
 
-### MLFQ (implemented)
+### MLFQ
 
 - Level 0 uses `q`, level 1 uses `2q`, and level 2 uses `4q`.
 - Always select the highest non-empty level.
@@ -100,7 +100,7 @@ changing ownership or waking processes.
 - A periodic boost moves ready processes to level 0 and resets their quantum
   state.
 
-### Deadlock detection (implemented)
+### Deadlock detection
 
 Use the multi-instance detection algorithm:
 
@@ -118,39 +118,47 @@ in ascending order:
 DEADLOCK t=<now> pids: <pid> <pid> ...
 ```
 
-## Implementation order
+## Validation and comparison
 
-1. Add shared scheduler helper functions and initialize each policy's queues.
-2. Implement SJF and SRTF, then verify burst ordering and preemption.
-3. Implemented priority scheduling and equal-priority round robin.
-4. Implemented MLFQ demotion, blocking behavior, and periodic boosting.
-5. Implemented deadlock detection using copied work/finish arrays.
-6. Add hand-computed expected metrics and Gantt-chart checks to
-   `tests/run.sh`.
-7. Run the complete regression script and record results.
-
-## Validation plan
-
-The existing workloads provide the first regression layer:
+The regression suite covers hand-computed textbook values, scheduling
+metrics/Gantt checks on `workloads/arrivals.txt`, priority round-robin ties,
+the producer/consumer synchronization workload, and both single-instance
+and multi-instance deadlocks. Run it with:
 
 ```sh
 make
 make test
 ```
 
-For scheduler comparisons, use `workloads/arrivals.txt` with
-`--no-paging --gantt`. Record the first dispatch, completion, waiting time,
-and context-switch behavior for each policy. For synchronization, use
-`workloads/deadlock.txt` with `--deadlock-every 5`; processes 1 and 2 must be
-reported while process 3 completes.
+All comparisons below use `workloads/arrivals.txt`, `--no-paging`, and
+quantum 2 for RR, PRIO, and MLFQ. Times in the Gantt column are inclusive.
+The first dispatch is J1 under every policy.
 
-Before implementing policy code, expected values should be written beside
-each new test and checked against a manually drawn timeline. A test that
-only checks successful termination is not sufficient for a scheduler.
+| Policy | Gantt chart (tick range: process) | Completion tick | Avg. waiting | Avg. response | Context switches |
+|---|---|---:|---:|---:|---:|
+| FCFS | 0-6:J1, 7-15:J2, 16-18:J3, 19-20:J4, 21-25:J5, 26-29:J1, 30-35:J6, 36-38:J3 | 39 | 14.83 | 10.17 | 8 |
+| RR (q=2) | 0-1:J1, 2-3:J2, 4-5:J1, 6-7:J3, 8-9:J2, 10-11:J4, 12-13:J1, 14-15:J5, 16:J3, 17-18:J2, 19-20:J6, 21:J1, 22-23:J5, 24-25:J2, 26-27:J6, 28-29:J3, 30:J5, 31-32:J1, 33:J2, 34-35:J6, 36:J3, 37-38:J1 | 39 | 18.33 | 3.17 | 22 |
+| SJF | 0-6:J1, 7-8:J4, 9-11:J3, 12-15:J1, 16-20:J5, 21-23:J3, 24-29:J6, 30-38:J2 | 39 | 10.00 | 9.00 | 8 |
+| SRTF | 0-6:J1, 7-8:J4, 9-11:J3, 12-15:J1, 16:J5, 17-19:J3, 20-23:J5, 24-29:J6, 30-38:J2 | 39 | 9.83 | 9.00 | 9 |
+| PRIO (q=2) | 0-1:J1, 2-10:J2, 11:J1, 12-17:J6, 18-19:J4, 20-23:J1, 24-25:J3, 26:J5, 27-30:J1, 31:J3, 32-35:J5, 36:idle, 37-39:J3 | 40 | 12.83 | 8.33 | 12 |
+| MLFQ (q=2) | 0-1:J1, 2-3:J2, 4-5:J3, 6-7:J4, 8-9:J5, 10-11:J1, 12-13:J6, 14-17:J2, 18:J3, 19-21:J5, 22-23:J1, 24-25:J6, 26-27:J2, 28-30:J3, 31:J1, 32-33:J6, 34:J2, 35-38:J1 | 39 | 15.00 | 0.00 | 18 |
 
-## Out of scope for this preliminary setup
+This workload has staggered arrivals, CPU/I/O bursts, and priorities.
+SJF/SRTF select by the remaining current burst, not total process CPU time;
+at tick 4 SRTF does not preempt J1 because J1 and J3 both have three ticks
+left. It later preempts J5 at tick 17 when J3's remaining burst is strictly
+shorter. The PRIO timeline shows J2 preempting J1; `prio_ties.txt` separately
+checks round-robin rotation between equal-priority processes. MLFQ's timeline
+spans the tick-20 boost, and its policy uses quanta 2, 4, and 8.
 
-- No scheduler algorithm is completed here.
+The deadlock detector copies Available into a work vector, iteratively
+simulates finishable processes, and reports remaining blocked processes in
+ascending PID order. `deadlock.txt` checks the classic one-instance case;
+`deadlock_multi.txt` checks a deadlock where each process holds two instances
+and requests one instance from the other resource. Detection is report-only:
+it does not mutate resource allocations or recover from deadlock.
+
+## Deferred beyond Checkpoint 1
+
 - No deadlock victim termination or recovery policy is selected.
-- No changes are made to paging or disk modules.
-- No new dependency or build-system change is required.
+- Paging replacement and disk scheduling are deferred to later checkpoints.

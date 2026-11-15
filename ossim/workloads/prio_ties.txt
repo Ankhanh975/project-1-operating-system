@@ -1,0 +1,9 @@
+# Equal-priority processes rotate after each two-tick quantum.
+
+process P1 arrive=0 prio=1 pages=1
+    cpu 5
+end
+
+process P2 arrive=0 prio=1 pages=1
+    cpu 5
+end

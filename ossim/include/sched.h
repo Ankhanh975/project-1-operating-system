@@ -10,8 +10,7 @@
  *   on_dispatch(p)      p has just got the CPU (reset its quantum, etc.)
  *   on_tick(r)          r has just run one tick
  *
- * Given: FCFS and RR. TODO checkpoint 1: SJF, SRTF, PRIO, MLFQ.
- * The project handout shows how to add one.
+ * Implementations include FCFS, RR, SJF, SRTF, PRIO and MLFQ.
  */
 #ifndef OSSIM_SCHED_H
 #define OSSIM_SCHED_H
