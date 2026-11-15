@@ -1,0 +1,38 @@
+% --- VI. Theme Extension ---
+% Requisitos del enunciado para el tema:
+%   - se activa con una opción de línea de comandos; sin ella, todo igual
+%   - al menos una prueba con resultado calculado a mano
+%   - un experimento (cuenta como uno de los tres del reporte)
+\section{Theme: \todo{theme name}}
+\label{sec:theme}
+After the core simulator was complete, each team extended it with one extra mechanism, called the \emph{theme}, and used an experiment to study what this mechanism really changes~\cite{brief}. The extension is turned on with a command-line option, so a run without the option behaves exactly as before. This keeps all the results of Sections~\ref{sec:validation} and~\ref{sec:experiments} valid.
+
+\subsection{Motivation}
+\todo{What problem does the mechanism solve? One paragraph, with a reference to the textbook.}
+
+\subsection{Design}
+\todo{What was added to the simulator, in which files, and the command-line option that turns it on. A run without the option behaves exactly as before.}
+
+\begin{lstlisting}
+$ ./ossim workload.txt ... --TODO-option
+\end{lstlisting}
+
+\subsection{Validation}
+\todo{The hand-computed test: the input, the expected result worked out by hand, and the result of the simulator.}
+
+\subsection{Experiment 3: \todo{title}}
+
+\textbf{Question.} \todo{The question the theme experiment answers.}
+
+\textbf{Method.} \todo{Workloads, parameters, what is varied.}
+
+\textbf{Results.} \todo{Describe the plot or table.}
+
+\begin{figure}[H]
+    \centering
+    \figplaceholder{Plot or table of the theme experiment.}
+    \caption{\todo{caption}}
+    \label{fig:exp3}
+\end{figure}
+
+\textbf{Discussion.} \todo{What the mechanism actually changes, and when it does not help.}
