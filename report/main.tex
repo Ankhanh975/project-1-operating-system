@@ -15,6 +15,7 @@
 \usepackage{booktabs}     % tablas: \toprule, \midrule, \bottomrule
 \usepackage{pgfplots}     % gráficas dibujadas desde los CSV de data/
 \pgfplotsset{compat=1.17}
+\usetikzlibrary{positioning, arrows.meta, calc}   % diagrama de estados
 \usepackage{hyperref}
 
 % --- Estilo común de las gráficas ---
@@ -73,22 +74,15 @@
 }
 \lstset{style=bashstyle}
 
-% --- Marcas de trabajo pendiente ---
-% \todo{...} se ve en rojo en el PDF. Antes de entregar, buscar "\todo" y
-% "\figplaceholder" en todos los archivos: no debe quedar ninguno.
-\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO:} #1\textbf{]}}}
-% Recuadro que ocupa el lugar de una gráfica que todavía no existe.
-\newcommand{\figplaceholder}[1]{%
-    \fbox{\parbox[c][0.18\textheight][c]{0.92\columnwidth}{\centering\small #1}}}
-
 % --- Nombre del simulador ---
 \newcommand{\ossim}{\texttt{ossim}}
 
 \begin{document}
 
 % --- Título y autores ---
-\title{COMP2040: Operating Systems \\ Group Project: \ossim, an Integrated Kernel Simulator}
+\title{COMP2040: Operating Systems \\ Group Project, Checkpoint 1: \\ CPU Scheduling and Deadlock Detection in \ossim}
 
+% El nombre del tercer integrante usa acentos vietnamitas: \d{a} = ạ, \'{a} = á.
 \author{
     \IEEEauthorblockN{Daniela Méndez Ramírez}
     \IEEEauthorblockA{\textit{College of Engineering and Computer Science} \\
@@ -98,23 +92,22 @@
     \IEEEauthorblockN{Nguyen Huy An Khanh}
     \IEEEauthorblockA{\textit{College of Engineering and Computer Science} \\
     \textit{VinUniversity}, Hanoi, Vietnam \\
-    Student ID: \todo{ID}}
+    Student ID: V202401646}
     \and
-    \IEEEauthorblockN{\todo{Member 3 name}}
+    \IEEEauthorblockN{Ph\d{a}m Duy Ph\'{a}t}
     \IEEEauthorblockA{\textit{College of Engineering and Computer Science} \\
-    \textit{VinUniversity}, Hanoi, Vietnam \\
-    Student ID: \todo{ID}}
+    \textit{VinUniversity}, Hanoi, Vietnam}
 }
 
 \maketitle
 
 % --- Abstract ---
 \begin{abstract}
-In a real operating system, CPU scheduling, memory management, disk scheduling and synchronization run at the same time and depend on each other. In this project, our team builds \ossim, a kernel simulator written in C in which all of these mechanisms work together. The simulator moves forward one clock tick at a time. It includes six CPU schedulers, deadlock detection, three page-replacement policies, four disk schedulers and a tool that generates random workloads. We check every policy against examples that we solve by hand, and all 45 automatic tests pass. Then we use the simulator for experiments. The first experiment shows that SJF and SRTF give the lowest waiting time, while RR and MLFQ give the lowest response time, at every level of I/O. The second shows that CPU utilization falls from 66\% to 13\% when memory becomes too small, with a clear start of thrashing. The third studies \todo{theme experiment}.
+An operating system must decide which process uses the CPU and must also detect when a group of processes is blocked forever. This report presents Checkpoint~1 of our group project: \ossim, a kernel simulator written in C that moves forward one clock tick at a time. We focus on seven algorithms: six CPU schedulers (FCFS, Round Robin, SJF, SRTF, Priority and a three-level MLFQ) and the multi-instance deadlock detection algorithm. For each algorithm, we solve examples by hand and check that the simulator gives exactly the same Gantt chart and the same metrics; all automatic tests pass. Finally, we compare the six schedulers on random workloads with different amounts of I/O. SJF and SRTF give the lowest waiting time, while Round Robin and MLFQ give the lowest response time, so no scheduler is the best for every goal.
 \end{abstract}
 
 \begin{IEEEkeywords}
-Operating Systems, CPU Scheduling, Paging, Page Replacement, Disk Scheduling, Deadlock Detection, Simulation.
+Operating Systems, CPU Scheduling, Round Robin, Shortest Job First, Multilevel Feedback Queue, Deadlock Detection, Simulation.
 \end{IEEEkeywords}
 
 % --- Secciones ---
@@ -125,15 +118,14 @@ Operating Systems, CPU Scheduling, Paging, Page Replacement, Disk Scheduling, De
 \input{sections/03-design}
 \input{sections/04-validation}
 \input{sections/05-experiments}
-\input{sections/06-theme}
-\input{sections/07-conclusion}
-\input{sections/08-contributions}
+\input{sections/06-conclusion}
+\input{sections/07-contributions}
 
 % --- References ---
 \begin{thebibliography}{00}
 \bibitem{silberschatz} A. Silberschatz, P. B. Galvin, and G. Gagne, \textit{Operating System Concepts}, 10th ed. Hoboken, NJ, USA: Wiley, 2018.
 \bibitem{brief} College of Engineering and Computer Science, VinUniversity, ``COMP2040 Operating Systems -- Group Project and Suggested Themes,'' Fall 2026.
-\bibitem{repo} N. H. A. Khanh, D. Méndez Ramírez, and \todo{Member 3}, ``project-1-operating-system: the \texttt{ossim} kernel simulator,'' GitHub repository, 2026. [Online]. Available: \url{https://github.com/Ankhanh975/project-1-operating-system}
+\bibitem{repo} N. H. A. Khanh, D. Méndez Ramírez, and P. D. Ph\'{a}t, ``project-1-operating-system: the \texttt{ossim} kernel simulator,'' GitHub repository, 2026. [Online]. Available: \url{https://github.com/Ankhanh975/project-1-operating-system}
 \bibitem{claude} Anthropic, ``Claude,'' large language model. Accessed: Nov. 2026. [Online]. Available: \url{https://claude.ai}
 \end{thebibliography}
 

@@ -1,7 +1,7 @@
 % --- Appendix ---
 \section{Build and Run}
 \label{app:commands}
-The simulator and the generator are built and tested on Linux, macOS or WSL (the Linux environment of Windows):
+The simulator is built and tested on Linux, macOS or WSL (the Linux environment of Windows). The test file also contains the checks of the next checkpoint, so the total is larger than the 36 checks of Checkpoint~1:
 
 \begin{lstlisting}
 $ cd ossim
@@ -10,29 +10,40 @@ $ make test
 45 passed, 0 skipped (not implemented yet), 0 failed
 \end{lstlisting}
 
-The experiments are run from \texttt{ossim/}. Each script writes its CSV files to \texttt{report/data/}, and the plots of Section~\ref{sec:experiments} are drawn from these files when the report is compiled.
-
+Some examples of Section~\ref{sec:validation}:
 \begin{lstlisting}
-$ sh experiments/exp1_io.sh       # Experiment 1
-$ sh experiments/exp2_frames.sh   # Experiment 2
+$ ./ossim workloads/srtf_textbook.txt --sched srtf --no-paging --gantt
+$ ./ossim workloads/arrivals.txt --sched mlfq --quantum 2 --no-paging --gantt
+$ ./ossim workloads/deadlock_multi.txt --deadlock-every 1 --max-ticks 10 --no-paging
 \end{lstlisting}
 
-One run of each experiment, for one seed:
+The comparison of Section~\ref{sec:experiments} is run from \texttt{ossim/}. The script writes its CSV files to \texttt{report/data/}, and the plots are drawn from these files when the report is compiled:
 \begin{lstlisting}
-# Experiment 1 (P = 50)
+$ sh experiments/exp1_io.sh
+\end{lstlisting}
+
+One run of the comparison, for $P=50$ and one seed:
+\begin{lstlisting}
 $ ./wlgen --procs 10 --gap 3 --bursts 4 --cpu 6 --io-len 6 --disk 50 --io 50 --seed 1 > w.txt
 $ ./ossim w.txt --sched srtf --quantum 4 --no-paging
-
-# Experiment 2 (32 frames)
-$ ./wlgen --procs 8 --pages 16 --locality 70 --io 10 --cpu 30 --bursts 4 --gap 2 --seed 1 > w.txt
-$ ./ossim w.txt --sched rr --quantum 4 --disk fcfs --max-ticks 20000 --frames 32 --replace lru
 \end{lstlisting}
 
 \section{Hand-Computed Gantt Charts}
 \label{app:gantt}
-These are the Gantt charts of \texttt{arrivals.txt}, run with \texttt{--no-paging}. Each interval \texttt{a-b} means that the process used the CPU from tick $a$ until just before tick $b$. P1 to P6 are the jobs J1 to J6.
+These are the Gantt charts of \texttt{arrivals.txt} for the six schedulers, run with \texttt{--no-paging}. Each interval \texttt{a-b} means that the process used the CPU from tick $a$ until just before tick $b$. P1 to P6 are the jobs J1 to J6.
 
 \begin{lstlisting}
+FCFS:
+P1 0-7 | P2 7-16 | P3 16-19 | P4 19-21 | P5 21-26 |
+P1 26-30 | P6 30-36 | P3 36-39
+
+RR (q=2):
+P1 0-2 | P2 2-4 | P1 4-6 | P3 6-8 | P2 8-10 |
+P4 10-12 | P1 12-14 | P5 14-16 | P3 16-17 |
+P2 17-19 | P6 19-21 | P1 21-22 | P5 22-24 |
+P2 24-26 | P6 26-28 | P3 28-30 | P5 30-31 |
+P1 31-33 | P2 33-34 | P6 34-36 | P3 36-37 | P1 37-39
+
 SJF:
 P1 0-7 | P4 7-9 | P3 9-12 | P1 12-16 | P5 16-21 |
 P3 21-24 | P6 24-30 | P2 30-39
@@ -53,42 +64,4 @@ P5 19-22 | P1 22-24 | P6 24-26 | P2 26-28 |
 P3 28-31 | P1 31-32 | P6 32-34 | P2 34-35 | P1 35-39
 \end{lstlisting}
 
-\section{Hand Trace of the Clock Policy}
-\label{app:clock}
-Table~\ref{tab:clock} traces Clock with 3 frames (F0, F1, F2) on the textbook reference string. A star (*) means that the reference bit of the frame is set, and $h$ is the frame where the hand points after the reference. When a fault happens and there is no free frame, the hand clears the bits it finds set and stops at the first frame whose bit is clear.
-
-\begin{table}[H]
-\centering
-\caption{Clock with 3 frames: 14 page faults.}
-\label{tab:clock}
-\begin{tabular}{rrcccc c}
-\toprule
-\# & Ref & F0 & F1 & F2 & Fault & $h$ \\
-\midrule
-1 & 7 & 7* & -- & -- & yes & 0 \\
-2 & 0 & 7* & 0* & -- & yes & 0 \\
-3 & 1 & 7* & 0* & 1* & yes & 0 \\
-4 & 2 & 2* & 0 & 1 & yes & 1 \\
-5 & 0 & 2* & 0* & 1 & & 1 \\
-6 & 3 & 2* & 0 & 3* & yes & 0 \\
-7 & 0 & 2* & 0* & 3* & & 0 \\
-8 & 4 & 4* & 0 & 3 & yes & 1 \\
-9 & 2 & 4* & 2* & 3 & yes & 2 \\
-10 & 3 & 4* & 2* & 3* & & 2 \\
-11 & 0 & 4 & 2 & 0* & yes & 0 \\
-12 & 3 & 3* & 2 & 0* & yes & 1 \\
-13 & 0 & 3* & 2 & 0* & & 1 \\
-14 & 3 & 3* & 2 & 0* & & 1 \\
-15 & 2 & 3* & 2* & 0* & & 1 \\
-16 & 1 & 3 & 1* & 0 & yes & 2 \\
-17 & 2 & 3 & 1* & 2* & yes & 0 \\
-18 & 0 & 0* & 1* & 2* & yes & 1 \\
-19 & 1 & 0* & 1* & 2* & & 1 \\
-20 & 7 & 0 & 7* & 2 & yes & 2 \\
-21 & 0 & 0* & 7* & 2 & & 2 \\
-22 & 1 & 0* & 7* & 1* & yes & 0 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-For example, at reference 4 (page 2) all three bits are set. The hand starts at F0 and clears the bits of F0, F1 and F2. It comes back to F0, whose bit is now clear, so page 7 in F0 is the victim, and page 2 is loaded there.
+As an example of how the averages come from a chart, the FCFS waiting times are: J1 waits from 10 (end of its I/O) to 26, that is 16 ticks; J2 waits 5; J3 waits 12 before its first burst and 12 after its I/O, 24 in total; J4 waits 13; J5 waits 13; and J6 waits 18. The sum is 89, so the average is $89/6 = 14.83$, as in Table~\ref{tab:arrivals}.

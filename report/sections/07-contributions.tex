@@ -1,0 +1,37 @@
+% --- Team Contributions ---
+% El enunciado ajusta la nota de cada miembro (±20%) según el historial de
+% git y la evaluación entre pares. Esta tabla debe coincidir con los commits.
+\section*{Team Contributions}
+Checkpoint~1 was developed in parallel by two members. Nguyen Huy An Khanh implemented it in the shared repository, and Daniela Méndez Ramírez implemented and checked it independently. Both versions gave exactly the same results on every hand-computed case, so the team kept the version already in the repository and used the second one as an independent verification. The comparison of the schedulers and this report were built on top of that version. Table~\ref{tab:contributions} summarizes the main contributions of each member, and the commit history of the repository~\cite{repo} records the details.
+
+% Antes de entregar: los tres integrantes deben estar de acuerdo con esta
+% tabla, y debe coincidir con los commits de git.
+\begin{table}[H]
+\centering
+\caption{Contribution of each member.}
+\label{tab:contributions}
+\begin{tabular}{p{0.28\columnwidth}p{0.62\columnwidth}}
+\toprule
+Member & Main contributions \\
+\midrule
+Nguyen Huy An Khanh & Shared repository and project setup. Checkpoint~1 in the repository: SJF, SRTF, PRIO, MLFQ and multi-instance deadlock detection, with their tests, workloads and design note. \\
+\addlinespace
+Daniela Méndez Ramírez & Independent implementation and verification of Checkpoint~1, including the hand-computed Gantt charts of all six schedulers and the textbook test cases. The scheduler comparison (workload generator and experiment script), and the writing of this report. \\
+\addlinespace
+Ph\d{a}m Duy Ph\'{a}t & No commits in the repository for Checkpoint~1 at the time of writing. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% --- AI Tool Disclosure ---
+% El enunciado exige que el material externo se cite y que cada línea sea
+% entendida por quien la sube. Esta sección debe describir todos los usos.
+\section*{AI Tool Disclosure}
+The AI assistant Claude (Anthropic)~\cite{claude} was used in this project for the following purposes:
+\begin{itemize}
+    \item to improve the English writing of this report;
+    \item to explain operating-system concepts, such as the scheduling metrics, MLFQ and the deadlock detection algorithm;
+    \item to help the team read and understand the scaffold, a program split into many source and header files, and how its modules connect through function pointers;
+    \item to support the implementation and testing of parts of the simulator (CPU schedulers, tests, the workload generator and the experiment script), and to compare the results with our hand-computed traces.
+\end{itemize}
+The team reviewed and tested all the code and all the results, and takes full responsibility for them.

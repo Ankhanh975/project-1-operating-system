@@ -1,0 +1,14 @@
+% --- VI. Conclusion ---
+\section{Conclusion}
+\label{sec:conclusion}
+In Checkpoint~1, our team completed the scheduling and synchronization part of \ossim. The simulator now has seven working algorithms: six CPU schedulers (FCFS, RR, SJF, SRTF, PRIO and MLFQ) and multi-instance deadlock detection. We checked every algorithm against examples solved by hand, from the textbook and from our own workloads, and the simulator gives exactly the same Gantt charts and metrics. All the checks of this checkpoint pass.
+
+The comparison of the six schedulers shows a classic trade-off. SJF and SRTF give the lowest waiting time, while RR and MLFQ give the lowest response time, at every level of I/O. MLFQ is a good compromise, because it gives a fast first answer without knowing the length of the bursts.
+
+The current version also has some limitations, which are possible future work:
+\begin{itemize}
+    \item SJF and SRTF know the exact length of the next burst. A real OS must predict it, for example with exponential averaging~\cite[Sec.~5.3.2]{silberschatz}.
+    \item PRIO has no aging, so a process with a low priority can starve.
+    \item Deadlock detection only reports the deadlocked processes; it does not break the deadlock by terminating or rolling back a process.
+\end{itemize}
+The next checkpoint will add memory management and disk scheduling to the same simulator.

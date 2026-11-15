@@ -1,7 +1,7 @@
 % --- IV. Validation ---
 \section{Validation}
 \label{sec:validation}
-A simulator is only useful if its results are correct. To check \ossim, we use \textbf{hand-computed cases}: small examples that we solve on paper, step by step, before we run the simulator. If the simulator gives exactly the same numbers, we can trust the policy. Most examples come from the textbook~\cite{silberschatz}, so their answers are already known. When the textbook has no answer, we made our own example. All these checks are in \texttt{tests/run.sh}, and all 45 of them pass. The CPU tests use the option \texttt{--no-paging}, which turns off page faults, so that the result depends only on the CPU scheduler.
+A simulator is only useful if its results are correct. To check the seven algorithms, we use \textbf{hand-computed cases}: small examples that we solve on paper, step by step, before we run the simulator. If the simulator gives exactly the same numbers and the same Gantt chart, we can trust the algorithm. Some examples come from the textbook~\cite{silberschatz}, so their answers are already known; when the textbook has no answer, we made our own example. All these checks are in \texttt{tests/run.sh}. The file has 36 checks for the given scaffold and for this checkpoint, and all of them pass.
 
 \subsection{A Worked Example: SRTF}
 To show how a case is computed by hand, we use the SRTF example of the textbook~\cite[Sec.~5.3.2]{silberschatz}. Four processes arrive at times 0, 1, 2 and 3 with bursts of 8, 4, 9 and 5 ticks:
@@ -13,7 +13,7 @@ To show how a case is computed by hand, we use the SRTF example of the textbook~
 \end{itemize}
 The waiting times are 9, 0, 15 and 2 ticks, so the average is $26/4 = 6.50$. There are 5 context switches (P1, P2, P4, P1, P3). The simulator prints \texttt{avg\_waiting=6.50} and \texttt{context\_switches=5}, and its Gantt chart is identical.
 
-\subsection{CPU Schedulers: Textbook Cases}
+\subsection{Textbook Cases}
 Table~\ref{tab:cpu_textbook} shows all the textbook examples that we use~\cite[Sec.~5.3]{silberschatz}. In every case, the simulator gives exactly the textbook value.
 
 \begin{table}[H]
@@ -32,8 +32,28 @@ SRTF & arrivals 0--3, bursts 8, 4, 9, 5 & 6.50 \\
 \end{tabular}
 \end{table}
 
-\subsection{CPU Schedulers: Our Own Workload}
-The textbook examples are simple: the processes do no I/O and have no priorities. To test the schedulers in a harder situation, we use the workload \texttt{arrivals.txt}. It has six jobs (J1 to J6) with different arrival times and priorities, and two of them do I/O between their bursts. We drew the Gantt chart of every scheduler by hand (Appendix~\ref{app:gantt}) and compared it with the output of \texttt{--gantt}. They match tick by tick. Table~\ref{tab:arrivals} shows the averages.
+\subsection{All Six Schedulers on One Workload}
+The textbook examples are simple: the processes do no I/O and have no priorities. To test the schedulers in a harder situation, we use the workload \texttt{arrivals.txt}. It has six jobs (J1 to J6) with different arrival times and priorities, and two of them do I/O between two CPU bursts:
+
+\begin{table}[H]
+\centering
+\caption{The workload \texttt{arrivals.txt} (priority 1 is the highest).}
+\label{tab:arrivals_input}
+\begin{tabular}{lrrl}
+\toprule
+Job & Arrival & Priority & Operations \\
+\midrule
+J1 & 0 & 2 & cpu 7, io 3, cpu 4 \\
+J2 & 2 & 1 & cpu 9 \\
+J3 & 4 & 3 & cpu 3, io 5, cpu 3 \\
+J4 & 6 & 2 & cpu 2 \\
+J5 & 8 & 3 & cpu 5 \\
+J6 & 12 & 1 & cpu 6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+We drew the Gantt chart of every scheduler by hand (Appendix~\ref{app:gantt}) and compared it with the output of \texttt{--gantt}. They match tick by tick. Table~\ref{tab:arrivals} shows the averages.
 
 \begin{table}[H]
 \centering
@@ -43,6 +63,8 @@ The textbook examples are simple: the processes do no I/O and have no priorities
 \toprule
 Policy & Waiting & Response & Turnaround & Switches \\
 \midrule
+FCFS & 14.83 & 10.17 & 22.67 & 8 \\
+RR ($q=2$) & 18.33 & 3.17 & 26.17 & 22 \\
 SJF & 10.00 & 9.00 & 17.83 & 8 \\
 SRTF & 9.83 & 9.00 & 17.67 & 9 \\
 PRIO ($q=2$) & 12.83 & 8.33 & 20.67 & 12 \\
@@ -51,34 +73,27 @@ MLFQ ($q=2$) & 15.00 & 0.00 & 22.83 & 18 \\
 \end{tabular}
 \end{table}
 
-SRTF has the lowest waiting time, as the theory says. The only difference between SRTF and SJF happens at $t=17$: job J3 comes back from I/O with 3 ticks of work, while J5 still has 4, so SRTF gives the CPU to J3. MLFQ gives the CPU to every job as soon as it arrives (response time 0), but it needs more than twice as many context switches as SJF (18 against 8).
+The table already shows the typical behavior of each algorithm:
+\begin{itemize}
+    \item \textbf{SRTF} has the lowest waiting time, as the theory says. The only difference with SJF happens at $t=17$: J3 comes back from I/O with 3 ticks of work, while J5 still has 4, so SRTF gives the CPU to J3. At $t=4$, J3 arrives with 3 ticks and J1 also has 3 left; since the values are equal, J1 keeps the CPU. Both moments are checked by the tests.
+    \item \textbf{RR} has the best response time after MLFQ, but the worst waiting time and 22 context switches, because the quantum is short and every job is cut many times.
+    \item \textbf{PRIO} lets J2 preempt J1 at $t=2$, because J2 has priority 1. The jobs with priority 3 (J3 and J5) wait the longest.
+    \item \textbf{MLFQ} gives the CPU to every job as soon as it arrives (response time 0), because new jobs enter at level 0, above the jobs that have already used their quantum. The boost at $t=20$ is also checked: it moves J5 back to level 0 and gives it a new quantum.
+\end{itemize}
+
+\subsection{Equal Priorities}
+The workload \texttt{prio\_ties.txt} has two processes with the same priority and bursts of 5 ticks. With $q=2$, PRIO must alternate between them like Round Robin: P1 runs ticks 0--1, P2 ticks 2--3, P1 ticks 4--5, and so on. The simulator gives this exact order, an average waiting time of 4.50 and an average response time of 1.00, as computed by hand.
 
 \subsection{Deadlock Detection}
-The workload \texttt{deadlock.txt} has the classic deadlock: process A holds resource R1 and wants R2, and process B holds R2 and wants R1. A third process, C, does not use these resources. With \texttt{--deadlock-every 5}, the simulator prints \texttt{DEADLOCK t=15 pids: 1 2} at the first check after both processes block, and process C finishes normally. The producer-consumer workload, which uses three semaphores, finishes correctly under all six schedulers.
+We check the algorithm on two workloads. The first, \texttt{deadlock.txt}, has the classic case with one instance per resource: process A holds R1 and wants R2, and process B holds R2 and wants R1. A third process, C, does not use these resources. With \texttt{--deadlock-every 5}, the simulator prints \texttt{DEADLOCK t=15 pids: 1 2} at the first check after both processes block, and C finishes normally.
 
-\subsection{Page Replacement}
-We use the textbook reference string 7, 0, 1, 2, 0, 3, 0, 4, 2, 3, 0, 3, 0, 3, 2, 1, 2, 0, 1, 7, 0, 1 with 3 frames. The textbook gives 15 faults for FIFO and 12 for LRU~\cite[Sec.~10.4]{silberschatz}, and the simulator gives the same values. The textbook gives no value for Clock, so we traced it by hand frame by frame (Appendix~\ref{app:clock}). Clock gives 14 faults. This value is between FIFO and LRU, as expected: Clock approximates LRU, but with only one bit per frame it cannot know \emph{which} of two used pages was used more recently.
+The second workload, \texttt{deadlock\_multi.txt}, tests the multi-instance case. Resources R1 and R2 have two instances each. Process A takes both instances of R1 and then asks for one instance of R2; process B takes both instances of R2 and then asks for one instance of R1. By hand, at $t=1$:
+\begin{itemize}
+    \item \textit{Available} $= (0, 0)$, because all instances are held.
+    \item \textit{Allocation}: A $= (2, 0)$, B $= (0, 2)$.
+    \item \textit{Request}: A $= (0, 1)$, B $= (1, 0)$.
+    \item \textit{Work} $= (0, 0)$. The request of A does not fit, and the request of B does not fit either, so no process can be marked.
+\end{itemize}
+Both processes stay unmarked, so both are deadlocked. The simulator prints \texttt{DEADLOCK t=1 pids: 1 2}, which matches.
 
-\subsection{Disk Scheduling}
-Table~\ref{tab:disk} uses the textbook queue of requests 98, 183, 37, 122, 14, 124, 65, 67, with the head at cylinder 53 and a disk of 200 cylinders~\cite[Sec.~11.2]{silberschatz}. The first four rows are the textbook answers. The textbook solves SCAN only for the direction \emph{down} and C-LOOK only for \emph{up}, so we computed the other direction of each by hand. For example, SCAN moving up serves 65 to 183, continues to the edge at 199, turns around and serves 37 and 14, so the head moves $(199-53) + (199-14) = 331$ cylinders.
-
-\begin{table}[H]
-\centering
-\caption{Total head movement on the textbook queue.}
-\label{tab:disk}
-\begin{tabular}{lrl}
-\toprule
-Policy & Movement & Source \\
-\midrule
-FCFS & 640 & textbook \\
-SSTF & 236 & textbook \\
-SCAN (down) & 236 & textbook \\
-C-LOOK (up) & 322 & textbook \\
-SCAN (up) & 331 & hand trace \\
-C-LOOK (down) & 326 & hand trace \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Workload Generator}
-Two runs of \texttt{wlgen} with the same seed give identical files, and a generated workload runs to the end. As an extra check, we ran every combination of policies (6 schedulers, 3 replacement policies, 4 disk schedulers and 3 memory sizes) on 8 generated workloads, a total of 1728 runs. With enough memory, every run finished. With very little memory, some runs made almost no progress. Section~\ref{sec:experiments} explains this effect, which is thrashing.
+Without deadlock detection, \texttt{deadlock.txt} must still stop with A and B unfinished and C finished, and the producer-consumer workload, which uses three semaphores, must finish correctly. We run the producer-consumer workload with all six schedulers, and it finishes in every case.

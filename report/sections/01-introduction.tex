@@ -1,25 +1,29 @@
 % --- I. Introduction ---
 \section{Introduction}
-An operating system (OS) has many jobs. It decides which program uses the processor, it shares the memory between programs, it sends requests to the disk, and it stops programs from using the same resource in a wrong way. In the labs of this course, we studied each of these jobs alone: a CPU scheduler in one week, a page-replacement algorithm in another week, and a disk scheduler later. In a real system, however, these mechanisms work at the same time and depend on each other~\cite{brief}. For example:
+An operating system (OS) has many jobs. Two of the most important ones are deciding which program uses the processor, and making sure that programs that share resources do not block each other forever. In the labs of this course, we studied these topics one at a time with small, separate programs. In a real system, however, they work together~\cite{brief}. For example:
 \begin{itemize}
-    \item When a program needs a part of its memory that is not loaded (a \emph{page fault}), it must stop using the processor and wait for the disk.
-    \item When the disk finishes, the program becomes ready to run again, and the CPU scheduler must decide when it runs.
-    \item When a program waits for a lock that another program holds, the scheduler cannot choose it until the lock is free.
+    \item When a program starts an input/output (I/O) operation, it stops using the processor, and the scheduler must choose another program.
+    \item When the I/O operation ends, the program becomes ready again and competes with the others for the processor.
+    \item When a program waits for a resource that another program holds, the scheduler cannot choose it until the resource is free. If two programs wait for each other, they can wait forever.
 \end{itemize}
-So a slow disk can make the CPU idle, and a small memory can make the whole system slow. These effects are hard to see when each mechanism is studied alone.
 
 \subsection{Goal of the Project}
-The goal of this project is to build one simulator, called \ossim, in which all of these mechanisms run together, and then to use it as a tool for experiments. A \emph{simulator} is a program that imitates the behavior of another system. \ossim{} does not run real programs. Instead, it reads a text file (a \emph{workload}) that describes a set of imaginary processes: when they arrive, how long they use the CPU, when they do input/output (I/O), which pages of memory they use, and which locks they take. Then it simulates what an OS would do with them and measures the result.
+The goal of the project is to build one simulator, called \ossim, in which these mechanisms run together, and then to use it as a tool for experiments. A \emph{simulator} is a program that imitates the behavior of another system. \ossim{} does not run real programs. Instead, it reads a text file (a \emph{workload}) that describes a set of imaginary processes: when they arrive, how long they use the CPU, when they do I/O, and which resources they take. Then it simulates what an OS would do with them and measures the result. The command line selects the policy to use, so the same workload can be run with different schedulers and the results can be compared fairly.
 
-The command line of \ossim{} selects the policies to use: the CPU scheduler, the page-replacement policy, the disk scheduler, the number of memory frames and the disk parameters. In this way, the same workload can be run with different policies and the results can be compared fairly.
+\subsection{Scope of Checkpoint 1}
+The course gave a starting version of \ossim{} (the \emph{scaffold}). It already had the main loop of the simulator, the code for semaphores and resources, and two simple schedulers: FCFS and Round Robin. Checkpoint~1 covers processes, CPU scheduling and synchronization. Our team completed it by adding four CPU schedulers (SJF, SRTF, Priority and MLFQ) and a deadlock detection algorithm.
 
-\subsection{What the Team Built}
-The course gave a starting version of \ossim{} (the \emph{scaffold}). It already had the main loop of the simulator, the simplest policies (FCFS and Round Robin for the CPU, FIFO for memory and FCFS for the disk) and the code for semaphores and resources. Our team completed the rest in two checkpoints:
-\begin{itemize}
-    \item \textbf{Checkpoint 1} (processes, scheduling and synchronization): four more CPU schedulers (SJF, SRTF, Priority and MLFQ) and deadlock detection.
-    \item \textbf{Checkpoint 2} (memory and storage): two more page-replacement policies (LRU and Clock), three more disk schedulers (SSTF, SCAN and C-LOOK) and a workload generator.
-\end{itemize}
-For every policy, we first solved an example by hand and then checked that the simulator gives exactly the same answer. After that, we used the simulator for experiments, and we extended it with one extra mechanism (the \emph{theme}).
+In total, this report studies \textbf{seven algorithms}:
+\begin{enumerate}
+    \item FCFS (First-Come, First-Served)
+    \item RR (Round Robin)
+    \item SJF (Shortest Job First)
+    \item SRTF (Shortest Remaining Time First)
+    \item PRIO (preemptive Priority)
+    \item MLFQ (Multilevel Feedback Queue)
+    \item Multi-instance deadlock detection
+\end{enumerate}
+For every algorithm, we first solved an example by hand and then checked that the simulator gives exactly the same answer. After that, we used the simulator to compare the six schedulers on many random workloads.
 
 \subsection{Structure of this Report}
-Section~\ref{sec:background} explains the OS concepts that the rest of the report uses. Section~\ref{sec:design} describes how the simulator is built. Section~\ref{sec:validation} shows how we checked it against hand-computed examples. Section~\ref{sec:experiments} presents two experiments, and Section~\ref{sec:theme} presents the theme and its experiment. Section~\ref{sec:conclusion} summarizes the results. All the code is available in the team repository~\cite{repo}.
+Section~\ref{sec:background} explains the OS concepts that the rest of the report uses. Section~\ref{sec:design} describes how the simulator and the seven algorithms are built. Section~\ref{sec:validation} shows how we checked them against hand-computed examples. Section~\ref{sec:experiments} compares the six schedulers, and Section~\ref{sec:conclusion} summarizes the results. All the code is available in the team repository~\cite{repo}.

@@ -1,14 +1,14 @@
 % --- III. Simulator Design ---
 \section{Simulator Design}
 \label{sec:design}
-This section describes how \ossim{} is built: how the code is organized, what the input looks like, how one tick works, and how each group of policies is implemented.
+This section describes how \ossim{} is built: how the code is organized, what the input and the output look like, how one tick works, and how each of the seven algorithms is implemented.
 
 \subsection{Code Organization}
-\ossim{} is written in standard C (C99) and uses no external libraries. It is built with \texttt{make}, using the flags \texttt{-std=c99 -Wall -Wextra -Werror}. With \texttt{-Werror}, every compiler warning is treated as an error, so the code must compile without any warning. Each part of the simulator is a \textbf{module}: a header file in \texttt{include/} that declares what the module offers, and a source file in \texttt{src/} that contains the code. Table~\ref{tab:modules} lists the modules.
+\ossim{} is written in standard C (C99) and uses no external libraries. It is built with \texttt{make}, using the flags \texttt{-std=c99 -Wall -Wextra -Werror}. With \texttt{-Werror}, every compiler warning is treated as an error, so the code must compile without any warning. Each part of the simulator is a \textbf{module}: a header file in \texttt{include/} that declares what the module offers, and a source file in \texttt{src/} that contains the code. Table~\ref{tab:modules} lists the modules used in Checkpoint~1.
 
 \begin{table}[H]
 \centering
-\caption{Modules of \ossim.}
+\caption{Modules of \ossim{} used in Checkpoint 1.}
 \label{tab:modules}
 \begin{tabular}{p{0.27\columnwidth}p{0.63\columnwidth}}
 \toprule
@@ -21,42 +21,39 @@ File & Purpose \\
 \texttt{queue.c} & Queues of processes (ready queues, waiting lists). \\
 \texttt{sched.c} & The six CPU schedulers. \\
 \texttt{sync.c} & Semaphores, resources and deadlock detection. \\
-\texttt{mem.c} & Frames, page tables and the three replacement policies. \\
-\texttt{disk.c} & The disk and the four disk schedulers. \\
-\texttt{metrics.c} & The final report, the Gantt chart and the CSV output. \\
-\texttt{tools/wlgen.c} & The workload generator (a separate program). \\
+\texttt{metrics.c} & The final report and the Gantt chart. \\
 \texttt{tests/run.sh} & The automatic tests. \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+The simulator also contains modules for memory and the disk, which belong to the next checkpoint. In this report, all runs use the option \texttt{--no-paging}, which turns off page faults, so the results depend only on the CPU scheduler and on synchronization.
+
 \subsection{Input: the Workload File}
-A workload file describes semaphores, resources and processes, one instruction per line. Each process has an arrival time, a priority, a number of pages and a list of operations that it does in order. The example below shows a small workload with one lock:
+A workload file describes semaphores, resources and processes, one instruction per line. Each process has an arrival time, a priority and a list of operations that it does in order. The example below shows a process that computes, waits for I/O, and then uses a lock:
 
 \begin{lstlisting}
 semaphore lock 1
 
-process editor arrive=0 prio=2 pages=6
-    cpu 5 refs=0,1,2,3,4,5
-    disk 120
-    wait lock
-    cpu 2 refs=2,2
-    signal lock
+process editor arrive=0 prio=2
+    cpu 5
     io 3
+    wait lock
+    cpu 2
+    signal lock
 end
 \end{lstlisting}
 
 The operations are:
 \begin{itemize}
-    \item \texttt{cpu N}: use the CPU for $N$ ticks. The optional list \texttt{refs=} gives the page used in each tick.
-    \item \texttt{io N}: wait $N$ ticks for a generic device.
-    \item \texttt{disk C}: send a request for cylinder $C$ to the disk and wait until it is served.
+    \item \texttt{cpu N}: use the CPU for $N$ ticks.
+    \item \texttt{io N}: wait $N$ ticks for a device.
     \item \texttt{wait S}, \texttt{signal S}: semaphore operations.
     \item \texttt{acquire R n}, \texttt{release R n}: take or give back $n$ instances of resource $R$.
 \end{itemize}
 
 \subsection{Output: the Report}
-At the end of a run, \ossim{} prints one line per process and a summary. The output for the textbook Round Robin example (three processes with bursts 24, 3 and 3, quantum 4) is shown below, without the per-process table and the memory and disk lines:
+At the end of a run, \ossim{} prints one line per process and a summary. The output for the textbook Round Robin example (three processes with bursts 24, 3 and 3, quantum 4) is shown below in a shortened form:
 
 \begin{lstlisting}
 $ ./ossim workloads/basic.txt --sched rr --quantum 4 --no-paging --gantt
@@ -64,80 +61,59 @@ CPU timeline:
   [0-3] P1 | [4-6] P2 | [7-9] P3 | [10-29] P1 |
 summary
   ticks=30 finished=3/3 aborted=0
-  cpu_busy=30 cpu_idle=0 cpu_kernel=0 utilization=100.00%
   throughput=0.1000 procs/tick context_switches=4
   avg_turnaround=15.67 avg_waiting=5.67 avg_response=3.67
 \end{lstlisting}
 
-The option \texttt{--gantt} prints the \textbf{Gantt chart}, a timeline that shows which process used the CPU in each interval. The summary also has memory and disk numbers (page faults, head movement), and \texttt{--csv} saves the numbers of each process in a file for later analysis.
+The option \texttt{--gantt} prints the Gantt chart. Each interval \texttt{[a-b]} includes both ticks, so \texttt{[0-3] P1} means that P1 ran in ticks 0, 1, 2 and 3. The option \texttt{--trace} prints every change of state, which is very useful to follow a hand-computed example step by step.
 
 \subsection{The Tick Loop}
 The center of the simulator is the \textbf{tick loop} in \texttt{kernel.c}. In every tick, the kernel does five steps:
 \begin{enumerate}
-    \item \textbf{Deliver events.} Events whose time has come are handled: new processes arrive, I/O operations end, and disk requests finish. A process whose wait has ended goes back to the ready queue.
+    \item \textbf{Deliver events.} Events whose time has come are handled: new processes arrive and I/O operations end. A process whose wait has ended goes back to the ready queue.
     \item \textbf{Schedule.} The kernel asks the scheduler if the running process must be preempted. If the CPU is free, it asks the scheduler for the next process and gives it the CPU (\emph{dispatch}).
     \item \textbf{Account.} Every ready process adds one tick to its waiting time, and every blocked process adds one tick to its blocked time.
-    \item \textbf{Execute.} The running process uses one tick of its current CPU burst and references one page. If the page is not in memory, the tick is spent by the kernel to handle the page fault, the process blocks, and a request to read the page goes to the disk.
+    \item \textbf{Execute.} The running process uses one tick of its current CPU burst. When the burst ends, the process moves on to its next operation.
     \item \textbf{Check and advance.} If deadlock detection is enabled and it is time, it runs. Then the clock moves forward by one tick.
 \end{enumerate}
-Operations that take no time, like \texttt{signal} or a \texttt{wait} that does not block, are done immediately when a process reaches them. As a result, a process is in the ready queue only when its next operation is a CPU burst.
+Operations that take no time, like \texttt{signal} or a \texttt{wait} that does not block, are done immediately when a process reaches them. As a result, a process is in the ready queue only when its next operation is a CPU burst. The kernel is the only part of the code that changes the state of a process; the schedulers only manage their ready queues.
 
-\subsection{Policies as Interchangeable Parts}
-The kernel does not know which policy is running. Each policy is a C structure that contains \textbf{function pointers}, which are variables that store the address of a function. The kernel calls the functions through these pointers, so changing the policy only means choosing a different structure. For example, every CPU scheduler provides the same five functions:
+\subsection{Schedulers as Interchangeable Parts}
+The kernel does not know which scheduler is running. Each scheduler is a C structure that contains \textbf{function pointers}, which are variables that store the address of a function. The kernel calls the functions through these pointers, so changing the scheduler only means choosing a different structure. Every scheduler provides the same functions:
 \begin{itemize}
     \item \texttt{enqueue(p)}: process $p$ has become ready.
     \item \texttt{should\_preempt(r)}: should the running process $r$ leave the CPU now?
     \item \texttt{pick()}: remove and return the next process to run.
-    \item \texttt{on\_dispatch(p)}, \texttt{on\_tick(r)}: update counters, such as the quantum used.
+    \item \texttt{on\_dispatch(p)}, \texttt{on\_tick(r)}: update counters, such as the part of the quantum already used.
 \end{itemize}
-The memory policies (\texttt{replacer\_t}) and the disk policies (\texttt{disk\_sched\_t}) follow the same idea. Thanks to this design, we could add new policies without changing the kernel.
+Thanks to this design, we could add four schedulers without changing the kernel. The ready queues use two helper functions: \texttt{q\_pop\_min()} removes the process with the smallest value of a \emph{key} (for example, the remaining burst), and \texttt{q\_min\_key()} returns that smallest value without removing anything. When two processes have the same key, the one that entered the queue first wins. This rule makes every run deterministic, which is necessary for the hand-computed tests.
 
-\subsection{CPU Schedulers}
-FCFS and RR were given in the scaffold. The four schedulers that we added work as follows:
-\begin{itemize}
-    \item \textbf{SJF} keeps one ready queue and, when the CPU is free, takes the process with the shortest remaining time in its \emph{current} burst. It never preempts. In a real OS the length of the next burst is unknown and must be predicted; the simulator knows it exactly, which makes SJF an ideal reference.
-    \item \textbf{SRTF} uses the same queue and the same key. Before every tick, it compares the running process with the best ready process. It preempts only when the ready process has \emph{strictly} less time left, so two equal values do not cause a useless context switch.
-    \item \textbf{PRIO} takes the ready process with the smallest priority number. A process with a higher priority preempts the running one. Processes with the same priority share the CPU in Round Robin with quantum $q$.
-    \item \textbf{MLFQ} has three queues. Level 0 has quantum $q$, level 1 has $2q$ and level 2 has $4q$. The scheduler always takes a process from the highest non-empty level. A process that uses its whole quantum moves down one level; a process that blocks before the end of its quantum keeps its level. Every 20 ticks, a \textbf{priority boost} moves all processes back to level 0. Without the boost, a long process at level 2 could wait forever behind new short processes (\textbf{starvation}).
-\end{itemize}
-When two processes have the same key (the same burst length or priority), the one that entered the ready queue first is chosen. This rule makes every run deterministic, which is necessary for the hand-computed tests.
+\subsection{The Six CPU Schedulers}
+\textbf{FCFS} (given) keeps one first-in, first-out queue and never preempts.
+
+\textbf{RR} (given) uses the same queue, but counts the ticks that the running process has used. When the quantum is used up and another process is ready, the running process goes to the end of the queue. If no other process is ready, it keeps the CPU and starts a new quantum.
+
+\textbf{SJF} keeps one ready queue and, when the CPU is free, takes the process with the shortest remaining time in its \emph{current} burst. It never preempts. In a real OS, the length of the next burst is unknown and must be predicted, for example with exponential averaging~\cite[Sec.~5.3.2]{silberschatz}. The simulator knows it exactly, which makes SJF an ideal reference.
+
+\textbf{SRTF} uses the same key. Before every tick, it compares the running process with the best ready process. It preempts only when the ready process has \emph{strictly} less time left, so two equal values do not cause a useless context switch.
+
+\textbf{PRIO} takes the ready process with the smallest priority number. A process with a higher priority preempts the running one at once. Processes with the same priority share the CPU in Round Robin with quantum $q$. PRIO has no aging, so a process with a low priority can starve.
+
+\textbf{MLFQ} has three queues. Level 0 has quantum $q$, level 1 has $2q$ and level 2 has $4q$. A new process starts at level 0. The scheduler always takes a process from the highest non-empty level, and a process at a higher level preempts a process at a lower level. A process that uses its whole quantum moves down one level; a process that blocks before the end of its quantum keeps its level. Every 20 ticks, a \textbf{priority boost} moves all processes back to level 0. Without the boost, a long process at level 2 could starve behind new short processes.
 
 \subsection{Deadlock Detection}
 Each resource keeps three pieces of information: how many instances are free (\textit{Available}), how many each process holds (\textit{Allocation}) and how many each blocked process is asking for (\textit{Request}). Deadlock detection uses the algorithm for resources with several instances~\cite[Sec.~8.6.2]{silberschatz}:
 \begin{enumerate}
-    \item Copy \textit{Available} into a work vector \textit{Work}.
-    \item Find a process whose \textit{Request} fits in \textit{Work}. This process could get what it asks for, finish, and give back what it holds, so add its \textit{Allocation} to \textit{Work} and mark it. Repeat until no more processes can be marked.
-    \item The blocked processes that are not marked are deadlocked.
+    \item Copy \textit{Available} into a work vector \textit{Work}. No process is marked.
+    \item Find an unmarked process whose \textit{Request} is not larger than \textit{Work}. This process could get what it asks for, finish, and give back everything it holds, so add its \textit{Allocation} to \textit{Work} and mark it. Repeat until no more processes can be marked.
+    \item The blocked processes that are still unmarked are deadlocked.
 \end{enumerate}
-The option \texttt{--deadlock-every N} runs the check every $N$ ticks. The check only reads the state of the system and never changes it. When it finds a deadlock, it prints a line such as \texttt{DEADLOCK t=15 pids: 1 2}. The same group of processes is reported only once.
+The idea of step 2 is optimistic: if a process can finish, it will release its resources and help the others. A process that cannot be marked has no possible way to get what it needs.
 
-\subsection{Memory Management}
-All processes share \texttt{--frames} frames. When a process references a page that is in memory (a \emph{hit}), the kernel records the time of the reference and sets the reference bit of the frame. When the page is not in memory (a \emph{fault}), the kernel takes a free frame or, if there is none, asks the replacement policy for a victim. The process blocks, and a request to read the page (a \emph{page-in}) is sent to the disk. When the disk finishes, the page becomes valid and the process returns to the ready queue to try the same reference again. A frame whose page is still being loaded can never be chosen as a victim.
-
-The three policies only choose the victim, because the kernel already keeps the needed information for each frame:
-\begin{itemize}
-    \item \textbf{FIFO} (given) chooses the frame with the oldest load time.
-    \item \textbf{LRU} chooses the frame with the oldest time of last use. If two frames have the same time, the one with the lower index is chosen.
-    \item \textbf{Clock} keeps the position of its hand between faults. It visits the frames in a circle, skips frames that are free or still loading, clears the reference bit of a used frame, and stops at the first frame whose bit is already clear. Two complete turns are always enough: the first one clears every bit, and the second one finds a victim.
-\end{itemize}
-
-\subsection{Disk Scheduling}
-The disk serves one request at a time. A request takes $\lceil d \cdot c_s / v \rceil + c_t$ ticks, where $d$ is the number of cylinders the head moves, $c_s$ the seek cost, $v$ the seek speed and $c_t$ the transfer cost (all set from the command line). Requests come from page faults and from \texttt{disk} operations. When the disk becomes free, the disk scheduler chooses the next request:
-\begin{itemize}
-    \item \textbf{FCFS} (given) takes the oldest request.
-    \item \textbf{SSTF} takes the request closest to the head.
-    \item \textbf{SCAN} takes the closest request in the current direction. If there is none, the head first goes to the edge of the disk (cylinder 0 or the last cylinder), turns around and then takes the closest request. The trip to the edge is added to the head movement.
-    \item \textbf{C-LOOK} takes the closest request in the current direction. If there is none, it jumps to the request that is furthest in the other direction and keeps the same direction. The jump is also counted as head movement.
-\end{itemize}
-SSTF can cause starvation: a request far from the head may wait for a long time if new requests keep arriving near the head.
-
-\subsection{Workload Generator}
-Experiments need many workloads, and writing them by hand would be slow. The generator \texttt{wlgen} writes a random workload in the format of \ossim. Its options control the number of processes, the length of the CPU bursts, the \textbf{I/O intensity} (how often a process blocks between two bursts), the locality of the page references and the locality of the disk requests. For example, \texttt{--locality 70} means that 70\% of the references stay within one page of the previous one, and the rest jump to any page.
-
-A random number generator produces numbers that look random but are computed by a formula from a starting value, the \textbf{seed}. The C function \texttt{rand()} uses a different formula on different systems, so the same seed could give different workloads. For this reason, \texttt{wlgen} uses its own simple formula (a \emph{linear congruential generator}). The same seed always gives the same file on every computer, so every experiment can be repeated exactly.
+The option \texttt{--deadlock-every N} runs the check every $N$ ticks. The check only reads the state of the system and never changes it. When it finds a deadlock, it prints a line such as \texttt{DEADLOCK t=15 pids: 1 2}, with the process identifiers from small to large. Since no process is terminated to break the deadlock, the same group would be found at every check, so it is printed only once.
 
 \subsection{Testing}
-The file \texttt{tests/run.sh} contains the automatic tests, and \texttt{make test} runs them. Each test runs \ossim{} on a workload and checks one number of the summary, for example \texttt{avg\_waiting=7.00}, against a value that we computed by hand. A test prints PASS if the number is correct, FAIL if it is wrong, and SKIP if the policy is not implemented yet. In this way, the tests were written before the code, and they showed our progress during the project.
+The file \texttt{tests/run.sh} contains the automatic tests, and \texttt{make test} runs them. Each test runs \ossim{} on a workload and checks one result against a value that we computed by hand. Some tests check a number of the summary, for example \texttt{avg\_waiting=7.00}; others check a piece of the Gantt chart, for example \texttt{[16-16] P5 | [17-19] P3}. A test prints PASS if the result is correct, FAIL if it is wrong, and SKIP if the algorithm is not implemented yet. In this way, the tests were written before the code, and they showed our progress during the checkpoint.
 
 \subsection{Teamwork}
-The team works in a shared git repository~\cite{repo}. Each member makes regular commits, and each design note (\texttt{CHECKPOINT1.md} and \texttt{CHECKPOINT2.md}) records the rules of the policies, the hand-computed examples and the results of each checkpoint.
+The team works in a shared git repository~\cite{repo}. Each member makes regular commits, and the design note \texttt{CHECKPOINT1.md} records the rules of the algorithms, the hand-computed examples and the results.

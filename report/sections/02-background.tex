@@ -3,19 +3,44 @@
 % la primera vez que aparece, con una explicación corta.
 \section{Background}
 \label{sec:background}
-This section explains the main concepts of the project in simple terms. All of them come from the course textbook~\cite{silberschatz}.
+This section explains the main concepts of Checkpoint~1 in simple terms. All of them come from the course textbook~\cite{silberschatz}.
 
 \subsection{Processes and Their States}
-A \textbf{process} is a program in execution. The OS keeps the information of each process in a \textbf{process control block (PCB)}: its identifier (\emph{pid}), its state, its priority, its memory information and some counters.
+A \textbf{process} is a program in execution. The OS keeps the information of each process in a \textbf{process control block (PCB)}: its identifier (\emph{pid}), its state, its priority and some counters, such as the time it has used the CPU.
 
-A process is always in one of five \textbf{states}:
+A process is always in one of five \textbf{states} (Fig.~\ref{fig:states}):
 \begin{itemize}
     \item \textbf{New}: the process is being created.
     \item \textbf{Ready}: the process can run and waits for the CPU in the \textbf{ready queue}.
     \item \textbf{Running}: the process is using the CPU. With one CPU, only one process can be running.
-    \item \textbf{Waiting} (or blocked): the process waits for something, for example the end of an I/O operation, a page from the disk or a lock.
+    \item \textbf{Waiting} (or blocked): the process waits for something, for example the end of an I/O operation or a resource that another process holds.
     \item \textbf{Terminated}: the process has finished.
 \end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        state/.style={draw, rounded corners, minimum width=1.55cm, minimum height=0.65cm, font=\footnotesize},
+        edge/.style={-{Stealth}, thick},
+        lbl/.style={font=\scriptsize, align=center},
+        node distance=0.75cm and 0.95cm,
+    ]
+        \node[state] (new)  {New};
+        \node[state, right=of new]  (ready) {Ready};
+        \node[state, right=of ready] (run)  {Running};
+        \coordinate (mid) at ($(ready)!0.5!(run)$);
+        \node[state, below=1.4cm of mid] (wait) {Waiting};
+        \node[state, above=of run] (term) {Terminated};
+        \draw[edge] (new) -- node[lbl, above] {arrival} (ready);
+        \draw[edge] (ready.north east) to[bend left=25] node[lbl, above] {dispatch} (run.north west);
+        \draw[edge] (run.south west) to[bend left=25] node[lbl, below] {preempted} (ready.south east);
+        \draw[edge] (run) -- node[lbl, right] {exit} (term);
+        \draw[edge] (run.south) to[bend left=20] node[lbl, right] {I/O, wait,\\ acquire} (wait.east);
+        \draw[edge] (wait.west) to[bend left=20] node[lbl, left] {I/O done,\\ signal, release} (ready.south);
+    \end{tikzpicture}
+    \caption{The five states of a process and the events that move a process from one state to another.}
+    \label{fig:states}
+\end{figure}
 
 The life of a process is a sequence of \textbf{CPU bursts} (periods of computing) and \textbf{I/O bursts} (periods of waiting for a device). A process with long CPU bursts is \emph{CPU-bound}; a process with many short bursts and a lot of I/O is \emph{I/O-bound}.
 
@@ -26,7 +51,7 @@ A scheduler is \textbf{preemptive} if it can take the CPU away from a running pr
 
 The six schedulers of \ossim{} are:
 \begin{itemize}
-    \item \textbf{FCFS} (First-Come, First-Served): processes run in the order they become ready.
+    \item \textbf{FCFS} (First-Come, First-Served): processes run in the order they become ready. It is non-preemptive.
     \item \textbf{RR} (Round Robin): like FCFS, but each process runs for at most one quantum and then goes to the end of the queue.
     \item \textbf{SJF} (Shortest Job First): the process with the shortest next CPU burst runs first. It is non-preemptive.
     \item \textbf{SRTF} (Shortest Remaining Time First): the preemptive version of SJF. If a new process has less work left than the running one, it takes the CPU.
@@ -34,40 +59,22 @@ The six schedulers of \ossim{} are:
     \item \textbf{MLFQ} (Multilevel Feedback Queue): several queues with different priorities. A process that uses its whole quantum moves to a lower queue, so long CPU-bound processes go down and short interactive processes stay at the top.
 \end{itemize}
 
+Some schedulers can cause \textbf{starvation}: a process waits for a very long time, or forever, because other processes are always chosen first. For example, under PRIO a process with a low priority may never run if processes with a high priority keep arriving. A common solution is \textbf{aging}, which slowly raises the priority of a process that waits for a long time. MLFQ uses a similar idea, the \emph{priority boost}, explained in Section~\ref{sec:design}.
+
 To compare schedulers, we use these \textbf{metrics} for each process. Lower values are better for all of them.
 \begin{itemize}
     \item \textbf{Turnaround time}: time from arrival to termination.
     \item \textbf{Waiting time}: total time spent in the ready queue.
     \item \textbf{Response time}: time from arrival until the process runs for the first time. It matters for interactive programs.
 \end{itemize}
-For the whole system, we also use \textbf{CPU utilization}, the percentage of time the CPU does useful work, and \textbf{throughput}, the number of processes that finish per unit of time.
+For the whole system, we also count the number of context switches. A \textbf{Gantt chart} is a timeline that shows which process used the CPU in each interval. It is the usual way to solve a scheduling example by hand.
 
 \subsection{Synchronization and Deadlock}
 When processes share data or devices, they must coordinate. A \textbf{semaphore} is an integer counter with a list of waiting processes and two operations. \texttt{wait} decreases the counter if it is greater than zero; if it is zero, the process blocks and joins the list. \texttt{signal} wakes up the first process in the list or, if nobody is waiting, increases the counter. A semaphore with initial value 1 works as a \textbf{lock}: only one process at a time can be inside the protected part of the code.
 
-A \textbf{resource} is something that processes request and release, such as a printer. A resource can have several identical \textbf{instances}. A \textbf{deadlock} happens when a group of processes wait for each other forever. For example, process A holds resource R1 and waits for R2, while process B holds R2 and waits for R1. Neither of them can continue. \textbf{Deadlock detection} is an algorithm that looks at who holds what and who waits for what, and finds the processes that can never continue.
+A \textbf{resource} is something that processes request and release, such as a printer. A resource can have several identical \textbf{instances}; for example, a system may have two printers of the same type. A \textbf{deadlock} happens when a group of processes wait for each other forever. For example, process A holds resource R1 and waits for R2, while process B holds R2 and waits for R1. Neither of them can continue. A deadlock can only happen when four conditions are true at the same time~\cite[Sec.~8.3]{silberschatz}: \emph{mutual exclusion} (a resource is used by one process at a time), \emph{hold and wait} (a process holds resources while it waits for more), \emph{no preemption} (a resource cannot be taken away), and \emph{circular wait} (each process waits for the next one in a circle).
 
-\subsection{Memory and Paging}
-Each process sees its memory as a list of fixed-size blocks called \textbf{pages}. The physical memory is divided into blocks of the same size called \textbf{frames}. The \textbf{page table} of a process says, for each page, in which frame it is, or that it is not in memory. This technique is called \textbf{paging}.
-
-When a process uses (\emph{references}) a page that is not in memory, a \textbf{page fault} happens. The process blocks, the OS reads the page from the disk into a free frame, and then the process can continue. If there is no free frame, the OS must choose a page to remove (the \textbf{victim}). This choice is the job of the \textbf{page-replacement policy}:
-\begin{itemize}
-    \item \textbf{FIFO}: remove the page that was loaded first.
-    \item \textbf{LRU} (Least Recently Used): remove the page that has not been used for the longest time.
-    \item \textbf{Clock} (or second chance): a cheaper approximation of LRU. Each frame has a \textbf{reference bit} that is set when its page is used. A pointer (the \emph{hand}) moves around the frames. A page with the bit set gets a second chance: the bit is cleared and the hand moves on. The first page with the bit clear is the victim.
-\end{itemize}
-In \ossim, replacement is \textbf{global}: all processes share the same frames, so one process can take a frame from another.
-
-Programs usually show \textbf{locality of reference}: in a short period they use only a small set of pages, called their \textbf{working set}. If the frames cannot hold the working sets of all processes, the processes keep removing each other's pages. Then almost every reference is a page fault, the processes spend most of the time waiting for the disk, and CPU utilization falls. This situation is called \textbf{thrashing}.
-
-\subsection{Disk Scheduling}
-A hard disk stores data on circular tracks; the tracks at the same position on all surfaces form a \textbf{cylinder}. A \textbf{head} must move to the correct cylinder before it can read or write. The time of this movement is the \textbf{seek time}, and it grows with the distance. The time to move the data itself is the \textbf{transfer time}. Since seeking is slow, the order in which requests are served matters. We measure it with the \textbf{total head movement}, the number of cylinders the head crosses. The four disk schedulers of \ossim{} are:
-\begin{itemize}
-    \item \textbf{FCFS}: serve the requests in arrival order.
-    \item \textbf{SSTF} (Shortest Seek Time First): serve the request closest to the head.
-    \item \textbf{SCAN} (the elevator algorithm): move in one direction serving requests until the end of the disk, then turn around.
-    \item \textbf{C-LOOK}: move in one direction only as far as the last request, then jump back to the first request at the other end and continue in the same direction.
-\end{itemize}
+\textbf{Deadlock detection} is an algorithm that looks at who holds what and who waits for what, and finds the processes that can never continue. When every resource has one instance, a cycle in a graph of who waits for whom is enough to show a deadlock. With several instances, a cycle is not enough, and the OS needs the algorithm described in Section~\ref{sec:design}.
 
 \subsection{Tick-Driven Simulation}
 \ossim{} is a \textbf{tick-driven} simulator. Time is divided into small, equal steps called \textbf{ticks}, and the simulator updates the whole system once per tick. An event that will happen in the future, like the end of an I/O operation, is stored with its time and handled when the clock reaches it. Because the simulator has no real randomness, the same input always gives the same output. We call this property \textbf{determinism}, and it is what makes hand-computed tests possible.
